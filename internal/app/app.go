@@ -1,0 +1,53 @@
+package app
+
+import (
+	"fmt"
+	"log"
+	"os"
+
+	"routinist/internal/controller/http"
+	"routinist/internal/usecase"
+	"routinist/internal/usecase/repo"
+	"routinist/pkg/logger"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+)
+
+func Run() {
+	// Initialize logger
+	l := logger.New("app")
+
+	// Get database connection string from environment
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Fatal("DATABASE_URL environment variable is not set")
+	}
+
+	// Connect to database
+	dbpool, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("Unable to connect to database: %v", err)
+	}
+
+	// Initialize Gin router
+	router := gin.Default()
+	authRepo := repo.NewAuthRepo(dbpool, l)
+	// Initialize auth service
+	authUseCase := usecase.NewAuthUseCase(authRepo, l)
+
+	// Setup routes
+	http.NewRouter(router, l, authUseCase)
+
+	// Get port from environment variable or use default
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	// Start server
+	if err := router.Run(fmt.Sprintf(":%s", port)); err != nil {
+		log.Fatalf("Server failed to start: %v", err)
+	}
+}
