@@ -12,7 +12,7 @@ import (
 func NewRouter(
 	handler *gin.Engine,
 	l logger.Interface,
-	tAuth usecase.Auth,
+	tAuth usecase.AuthUseCase,
 ) {
 	handler.Use(gin.Logger())
 	handler.Use(gin.Recovery())

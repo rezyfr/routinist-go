@@ -1,9 +1,11 @@
 package v1
 
 import (
+	"errors"
 	"net/http"
+	domainErr "routinist/internal/domain/errors"
+	"routinist/internal/domain/model"
 	"routinist/internal/dto"
-	"routinist/internal/entity"
 	"routinist/internal/usecase"
 	"routinist/pkg/logger"
 	"strings"
@@ -11,13 +13,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type authRoutes struct {
-	t usecase.Auth
+type AuthHandler struct {
+	t usecase.AuthUseCase
 	l logger.Interface
 }
 
-func NewAuthRoutes(handler *gin.RouterGroup, t usecase.Auth, l logger.Interface) {
-	r := &authRoutes{t, l}
+func NewAuthRoutes(handler *gin.RouterGroup, t usecase.AuthUseCase, l logger.Interface) {
+	r := &AuthHandler{t, l}
 
 	h1 := handler.Group("/auth")
 	{
@@ -26,10 +28,10 @@ func NewAuthRoutes(handler *gin.RouterGroup, t usecase.Auth, l logger.Interface)
 	}
 }
 
-func (r *authRoutes) register(c *gin.Context) {
+func (r *AuthHandler) register(c *gin.Context) {
 	response := dto.Response{}
 
-	var req entity.RegisterRequestDTO
+	var req model.RegisterRequestDTO
 	if err := c.Bind(&req); err != nil {
 		response.SetMessage("Invalid request")
 		c.JSON(http.StatusBadRequest, response)
@@ -63,14 +65,16 @@ func (r *authRoutes) register(c *gin.Context) {
 		return
 	}
 
-	token, err := r.t.Register(
-		c.Request.Context(),
-		req,
-	)
+	token, err := r.t.Register(&req)
 
 	if err != nil {
-		response.SetMessage(err.Error())
-		c.JSON(http.StatusInternalServerError, response)
+		if errors.Is(err, domainErr.ErrEmailAlreadyExists) {
+			response.SetMessage("User with this email already exists")
+			c.JSON(http.StatusBadRequest, response)
+		} else {
+			response.SetMessage("Something went wrong")
+			c.JSON(http.StatusInternalServerError, response)
+		}
 		return
 	}
 
@@ -78,24 +82,26 @@ func (r *authRoutes) register(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-func (r *authRoutes) login(c *gin.Context) {
+func (r *AuthHandler) login(c *gin.Context) {
 	response := dto.Response{}
 
-	var req entity.LoginRequestDTO
+	var req model.LoginRequestDTO
 	if err := c.Bind(&req); err != nil {
 		response.SetMessage("Invalid request")
 		c.JSON(http.StatusBadRequest, response)
 		return
 	}
 
-	token, err := r.t.Login(
-		c.Request.Context(),
-		req,
-	)
+	token, err := r.t.Login(&req)
 
 	if err != nil {
-		response.SetMessage(err.Error())
-		c.JSON(http.StatusInternalServerError, response)
+		if errors.Is(err, domainErr.ErrInvalidCredentials) {
+			response.SetMessage("Invalid username or password")
+			c.JSON(http.StatusBadRequest, response)
+		} else {
+			response.SetMessage("Something went wrong")
+			c.JSON(http.StatusInternalServerError, response)
+		}
 		return
 	}
 

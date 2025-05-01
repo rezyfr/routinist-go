@@ -1,45 +1,43 @@
-package repo
+package repository
 
 import (
-	"context"
-	"fmt"
 	"math/rand"
 	"os"
-	"time"
-
-	"routinist/internal/entity"
+	"routinist/internal/domain/errors"
+	"routinist/internal/domain/model"
 	"routinist/pkg/logger"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
-type AuthRepo struct {
+type authRepo struct {
 	db     *gorm.DB
 	logger *logger.Logger
 }
 
-func NewAuthRepo(db *gorm.DB, logger *logger.Logger) *AuthRepo {
-	return &AuthRepo{
+func NewAuthRepo(db *gorm.DB, logger *logger.Logger) *authRepo {
+	return &authRepo{
 		db, logger,
 	}
 }
 
-func (rp *AuthRepo) Register(ctx context.Context, e entity.RegisterRequestDTO) (entity.AuthResponseDTO, error) {
+func (rp *authRepo) Register(e *model.RegisterRequestDTO) (*model.AuthResponseDTO, error) {
 	// Check if email already exists
-	var user entity.User
+	var user model.User
 
 	result := rp.db.Where("email = ?", e.Email).Limit(1).Find(&user)
 	exists := result.RowsAffected > 0
 	if exists {
-		return entity.AuthResponseDTO{}, fmt.Errorf("email already exists")
+		return &model.AuthResponseDTO{}, errors.ErrEmailAlreadyExists
 	}
 
 	// Hash the password
 	hash, err := bcrypt.GenerateFromPassword([]byte(e.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return entity.AuthResponseDTO{}, err
+		return &model.AuthResponseDTO{}, errors.ErrFailedToHashPassword
 	}
 
 	// Set default name if not provided
@@ -49,42 +47,42 @@ func (rp *AuthRepo) Register(ctx context.Context, e entity.RegisterRequestDTO) (
 	}
 
 	// Create user in database
-	user = entity.User{
+	user = model.User{
 		Email:    e.Email,
 		Password: string(hash),
 		Name:     name,
 	}
 	result = rp.db.Create(&user)
 	if result.Error != nil {
-		return entity.AuthResponseDTO{}, result.Error
+		return &model.AuthResponseDTO{}, result.Error
 	}
 
 	token, err := generateJWT(user.Email)
 	if err != nil {
-		return entity.AuthResponseDTO{}, err
+		return &model.AuthResponseDTO{}, errors.ErrFailedToGenerateJWT
 	}
 
-	return entity.AuthResponseDTO{Token: token}, nil
+	return &model.AuthResponseDTO{Token: token}, nil
 }
 
-func (rp *AuthRepo) Login(ctx context.Context, e entity.LoginRequestDTO) (entity.AuthResponseDTO, error) {
-	var user entity.User
+func (rp *authRepo) Login(e *model.LoginRequestDTO) (*model.AuthResponseDTO, error) {
+	var user model.User
 	result := rp.db.Where("email = ?", e.Email).Limit(1).Find(&user)
 
 	if result.Error != nil {
-		return entity.AuthResponseDTO{}, result.Error
+		return &model.AuthResponseDTO{}, errors.ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(e.Password)); err != nil {
-		return entity.AuthResponseDTO{}, err
+		return &model.AuthResponseDTO{}, errors.ErrInvalidCredentials
 	}
 
 	token, err := generateJWT(user.Email)
 	if err != nil {
-		return entity.AuthResponseDTO{}, err
+		return &model.AuthResponseDTO{}, errors.ErrFailedToGenerateJWT
 	}
 
-	return entity.AuthResponseDTO{Token: token}, nil
+	return &model.AuthResponseDTO{Token: token}, nil
 }
 
 func generateJWT(email string) (string, error) {

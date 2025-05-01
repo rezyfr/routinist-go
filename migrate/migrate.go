@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 	"os"
-	"routinist/internal/entity"
+	"routinist/internal/domain/model"
 
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
@@ -26,7 +26,7 @@ func init() {
 }
 
 func main() {
-	err := DB.AutoMigrate(&entity.User{})
+	err := DB.AutoMigrate(&model.User{})
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}

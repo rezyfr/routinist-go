@@ -1,4 +1,4 @@
-package entity
+package model
 
 type RegisterRequestDTO struct {
 	Email    string `json:"email"`
