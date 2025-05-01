@@ -1,39 +1,45 @@
 package usecase
 
 import (
-	"context"
-	"routinist/internal/entity"
+	"fmt"
+	"routinist/internal/domain/model"
+	"routinist/internal/domain/repository"
 	"routinist/pkg/logger"
 )
 
-type AuthUseCase struct {
-	repo   AuthRepo
+type AuthUseCase interface {
+	Login(request *model.LoginRequestDTO) (*model.AuthResponseDTO, error)
+	Register(request *model.RegisterRequestDTO) (*model.AuthResponseDTO, error)
+}
+
+type authUseCase struct {
+	repo   repository.AuthRepository
 	logger *logger.Logger
 }
 
-func NewAuthUseCase(r AuthRepo, l *logger.Logger) *AuthUseCase {
-	return &AuthUseCase{
+func NewAuthUseCase(r repository.AuthRepository, l *logger.Logger) AuthUseCase {
+	return &authUseCase{
 		repo:   r,
 		logger: l,
 	}
 }
 
-func (uc *AuthUseCase) Register(ctx context.Context, request entity.RegisterRequestDTO) (entity.AuthResponseDTO, error) {
+func (uc *authUseCase) Register(request *model.RegisterRequestDTO) (*model.AuthResponseDTO, error) {
 
-	token, err := uc.repo.Register(ctx, request)
+	token, err := uc.repo.Register(request)
 	if err != nil {
 		uc.logger.Error(err)
-		return token, err
+		return token, fmt.Errorf("failed to register: %w", err)
 	}
 
 	return token, nil
 }
 
-func (uc *AuthUseCase) Login(ctx context.Context, request entity.LoginRequestDTO) (entity.AuthResponseDTO, error) {
-	token, err := uc.repo.Login(ctx, request)
+func (uc *authUseCase) Login(request *model.LoginRequestDTO) (*model.AuthResponseDTO, error) {
+	token, err := uc.repo.Login(request)
 	if err != nil {
 		uc.logger.Error(err)
-		return token, err
+		return token, fmt.Errorf("failed to login: %w", err)
 	}
 
 	return token, nil

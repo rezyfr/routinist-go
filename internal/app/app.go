@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"routinist/internal/controller/http"
+	"routinist/internal/repository"
 	"routinist/internal/usecase"
-	"routinist/internal/usecase/repo"
 	"routinist/pkg/logger"
 
 	"github.com/gin-gonic/gin"
@@ -33,7 +33,7 @@ func Run() {
 
 	// Initialize Gin router
 	router := gin.Default()
-	authRepo := repo.NewAuthRepo(dbpool, l)
+	authRepo := repository.NewAuthRepo(dbpool, l)
 	// Initialize auth service
 	authUseCase := usecase.NewAuthUseCase(authRepo, l)
 

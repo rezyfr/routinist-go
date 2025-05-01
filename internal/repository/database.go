@@ -3,7 +3,7 @@ package repository
 import (
 	"log"
 	"os"
-	"routinist/internal/entity"
+	"routinist/internal/domain/model"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -21,7 +21,7 @@ func InitDB() {
 }
 
 func AutoMigrate() {
-	err := DB.AutoMigrate(&entity.User{})
+	err := DB.AutoMigrate(&model.User{})
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}

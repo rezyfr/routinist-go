@@ -15,14 +15,16 @@ routinist-go/
 ├── internal/
 │   ├── app/
 │   ├── controller/
+│   ├── domain/
 │   ├── dto/
-│   ├── entity/
 │   ├── middleware/
 │   ├── repository/
 │   └── usecase/
-│       └── repo/
+├── migrate/
+│   └── migrations.sql
 ├── pkg/
 │   └── logger/
+├── repo/
 ├── .env.example
 ├── .gitignore
 ├── go.mod
