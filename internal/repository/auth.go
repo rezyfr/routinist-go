@@ -51,6 +51,7 @@ func (rp *authRepo) Register(e *model.RegisterRequestDTO) (*model.AuthResponseDT
 		Email:    e.Email,
 		Password: string(hash),
 		Name:     name,
+		Gender:   e.Gender,
 	}
 	result = rp.db.Create(&user)
 	if result.Error != nil {

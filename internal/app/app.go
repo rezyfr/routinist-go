@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"routinist/internal/domain/model"
+	"routinist/internal/seed"
 
 	"routinist/internal/controller/http"
 	"routinist/internal/repository"
@@ -30,6 +32,13 @@ func Run() {
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
+
+	err = dbpool.AutoMigrate(&model.User{}, &model.Unit{}, &model.Habit{})
+	if err != nil {
+		log.Fatalf("Failed to migrations database: %v", err)
+	}
+
+	seed.Seed(dbpool, l)
 
 	// Initialize Gin router
 	router := gin.Default()
