@@ -13,6 +13,7 @@ func NewRouter(
 	handler *gin.Engine,
 	l logger.Interface,
 	tAuth usecase.AuthUseCase,
+	tHabit usecase.HabitUsecase,
 ) {
 	handler.Use(gin.Logger())
 	handler.Use(gin.Recovery())
@@ -22,5 +23,6 @@ func NewRouter(
 
 	{
 		v1.NewAuthRoutes(h, tAuth, l)
+		v1.NewHabitRoutes(h, tHabit, l)
 	}
 }
