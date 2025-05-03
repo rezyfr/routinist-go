@@ -33,7 +33,7 @@ func Run() {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 
-	err = dbpool.AutoMigrate(&model.User{}, &model.Unit{}, &model.Habit{})
+	err = dbpool.AutoMigrate(&model.User{}, &model.Unit{}, &model.Habit{}, &model.HabitUnit{}, &model.UserHabit{})
 	if err != nil {
 		log.Fatalf("Failed to migrations database: %v", err)
 	}
@@ -43,11 +43,14 @@ func Run() {
 	// Initialize Gin router
 	router := gin.Default()
 	authRepo := repository.NewAuthRepo(dbpool, l)
-	// Initialize auth service
+	habitRepo := repository.NewHabitRepo(dbpool, l)
+
+	// Initialize usecase
 	authUseCase := usecase.NewAuthUseCase(authRepo, l)
+	habitUseCase := usecase.NewHabitUseCase(habitRepo, l)
 
 	// Setup routes
-	http.NewRouter(router, l, authUseCase)
+	http.NewRouter(router, l, authUseCase, habitUseCase)
 
 	// Get port from environment variable or use default
 	port := os.Getenv("PORT")

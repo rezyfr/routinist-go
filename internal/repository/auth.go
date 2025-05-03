@@ -13,18 +13,18 @@ import (
 	"gorm.io/gorm"
 )
 
-type authRepo struct {
+type AuthRepo struct {
 	db     *gorm.DB
 	logger *logger.Logger
 }
 
-func NewAuthRepo(db *gorm.DB, logger *logger.Logger) *authRepo {
-	return &authRepo{
+func NewAuthRepo(db *gorm.DB, logger *logger.Logger) *AuthRepo {
+	return &AuthRepo{
 		db, logger,
 	}
 }
 
-func (rp *authRepo) Register(e *model.RegisterRequestDTO) (*model.AuthResponseDTO, error) {
+func (rp *AuthRepo) Register(e *model.RegisterRequestDTO) (*model.AuthResponseDTO, error) {
 	// Check if email already exists
 	var user model.User
 
@@ -53,11 +53,39 @@ func (rp *authRepo) Register(e *model.RegisterRequestDTO) (*model.AuthResponseDT
 		Name:     name,
 		Gender:   e.Gender,
 	}
+
 	result = rp.db.Create(&user)
 	if result.Error != nil {
 		return &model.AuthResponseDTO{}, result.Error
 	}
 
+	rp.logger.Info("User created: ", user)
+
+	// Check if habit valid
+	var habit model.Habit
+	habitResult := rp.db.Preload("Units").Where("id = ?", e.HabitID).First(&habit)
+	habitExists := habitResult.RowsAffected > 0
+	if !habitExists {
+		return &model.AuthResponseDTO{}, errors.ErrFailedToGenerateJWT
+	}
+
+	rp.logger.Info("Habit found: ", habit.Name)
+
+	unit := habit.Units[0]
+	// Link habit to user
+	userHabit := model.UserHabit{
+		UserID:  user.ID,
+		HabitID: habit.ID,
+		UnitID:  unit.ID,
+		Goal:    habit.DefaultGoal,
+	}
+
+	if err := rp.db.Create(&userHabit).Error; err != nil {
+		rp.logger.Error("Failed to create user habit: ", err)
+		return &model.AuthResponseDTO{}, errors.ErrFailedToAddHabit
+	}
+
+	rp.logger.Info("User habit created: ", userHabit)
 	token, err := generateJWT(user.Email)
 	if err != nil {
 		return &model.AuthResponseDTO{}, errors.ErrFailedToGenerateJWT
@@ -66,7 +94,7 @@ func (rp *authRepo) Register(e *model.RegisterRequestDTO) (*model.AuthResponseDT
 	return &model.AuthResponseDTO{Token: token}, nil
 }
 
-func (rp *authRepo) Login(e *model.LoginRequestDTO) (*model.AuthResponseDTO, error) {
+func (rp *AuthRepo) Login(e *model.LoginRequestDTO) (*model.AuthResponseDTO, error) {
 	var user model.User
 	result := rp.db.Where("email = ?", e.Email).Limit(1).Find(&user)
 

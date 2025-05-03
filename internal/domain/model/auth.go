@@ -5,7 +5,7 @@ type RegisterRequestDTO struct {
 	Password string `json:"password"`
 	Name     string `json:"name"`
 	Gender   string `json:"gender"`
-	HabitID  string `json:"habit_id"`
+	HabitID  uint   `json:"habit_id"`
 }
 
 type LoginRequestDTO struct {
