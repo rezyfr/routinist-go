@@ -7,17 +7,23 @@ import (
 	"gorm.io/gorm"
 )
 
-type habitRepo struct {
+type HabitRepo struct {
 	db     *gorm.DB
 	logger *logger.Logger
 }
 
-func NewHabitRepo(db *gorm.DB, logger *logger.Logger) *habitRepo {
-	return &habitRepo{db, logger}
+func NewHabitRepo(db *gorm.DB, logger *logger.Logger) *HabitRepo {
+	return &HabitRepo{db, logger}
 }
 
-func (r *habitRepo) GetRandomHabits() (*[]model.Habit, error) {
+func (r *HabitRepo) GetRandomHabits() (*[]model.Habit, error) {
 	var habits []model.Habit
-	r.db.Order("RANDOM()").Limit(8).Find(&habits)
+	if err := r.db.Preload("Units").
+		Order("RANDOM()").
+		Limit(8).
+		Find(&habits).Error; err != nil {
+		return nil, err
+	}
+
 	return &habits, nil
 }
