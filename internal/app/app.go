@@ -33,7 +33,10 @@ func Run() {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 
-	err = dbpool.AutoMigrate(&model.User{}, &model.Unit{}, &model.Habit{}, &model.HabitUnit{}, &model.UserHabit{})
+	err = dbpool.AutoMigrate(
+		&model.User{}, &model.Unit{}, &model.Habit{}, &model.HabitUnit{}, &model.UserHabit{},
+		&model.HabitProgress{},
+	)
 	if err != nil {
 		log.Fatalf("Failed to migrations database: %v", err)
 	}

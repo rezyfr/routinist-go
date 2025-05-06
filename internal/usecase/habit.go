@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"routinist/internal/domain/model"
 	"routinist/internal/domain/repository"
-	"routinist/internal/dto"
+	"routinist/internal/dto/response"
 	"routinist/pkg/logger"
 )
 
 type HabitUsecase interface {
 	GetRandomHabits() (*[]model.Habit, error)
-	GetTodayHabits(userId uint) ([]dto.UserHabitDto, error)
+	GetTodayHabits(userId uint) ([]response.UserHabitDto, error)
+	PostCreateHabitProgress(userId uint, userHabitId uint, value float64) (string, error)
 }
 
 type habitUseCase struct {
@@ -32,7 +33,7 @@ func (uc *habitUseCase) GetRandomHabits() (*[]model.Habit, error) {
 	return habits, nil
 }
 
-func (uc *habitUseCase) GetTodayHabits(userId uint) ([]dto.UserHabitDto, error) {
+func (uc *habitUseCase) GetTodayHabits(userId uint) ([]response.UserHabitDto, error) {
 	uh, err := uc.repo.GetTodayHabits(userId)
 
 	if err != nil {
@@ -40,9 +41,28 @@ func (uc *habitUseCase) GetTodayHabits(userId uint) ([]dto.UserHabitDto, error) 
 		return nil, fmt.Errorf("failed to get today habits: %w", err)
 	}
 
-	var result []dto.UserHabitDto
+	var result []response.UserHabitDto
 	for _, u := range uh {
-		result = append(result, dto.ToUserHabitDto(u))
+		p, err := uc.repo.GetProgress(u.ID)
+
+		if err != nil {
+			uc.logger.Error(err)
+			return nil, fmt.Errorf("failed to get habit progress: %w", err)
+		}
+		result = append(result, response.ToUserHabitDto(u, p))
 	}
 	return result, nil
+}
+
+func (uc *habitUseCase) PostCreateHabitProgress(userId uint, userHabitId uint, value float64) (string, error) {
+	uh, err := uc.repo.GetUserHabit(userHabitId, userId)
+
+	if err != nil {
+		uc.logger.Error(err)
+		return "", fmt.Errorf("failed to get habit: %w", err)
+	}
+
+	ph, e := uc.repo.CreateProgress(uh.ID, value)
+
+	return ph, e
 }

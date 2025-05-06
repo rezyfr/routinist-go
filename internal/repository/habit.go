@@ -48,3 +48,86 @@ func (r *HabitRepo) GetTodayHabits(userId uint) ([]model.UserHabit, error) {
 
 	return habits, err
 }
+
+func (r *HabitRepo) GetUserHabit(userId uint, userHabitId uint) (*model.UserHabit, error) {
+	var habit model.UserHabit
+
+	err := r.db.Preload("Habit").
+		Where("id = ?", userHabitId).
+		Where("user_id = ?", userId).
+		First(&habit).Error
+
+	if err != nil {
+		r.logger.Error("failed to get habit", err)
+		return nil, err
+	}
+
+	return &habit, nil
+}
+
+func (r *HabitRepo) CreateProgress(userHabitId uint, value float64) (string, error) {
+	var uh model.UserHabit
+	err := r.db.Preload("Habit").
+		Where("id = ?", userHabitId).
+		First(&uh).Error
+
+	if err != nil {
+		r.logger.Error("failed to get habit", err)
+		return "", err
+	}
+
+	// If habit has progress, update it
+	p := model.HabitProgress{}
+	exists := r.db.Where("user_habit_id = ?", userHabitId).Find(&p).RowsAffected > 0
+
+	if exists {
+		return r.UpdateProgress(p.ID, value)
+	}
+
+	ph := model.HabitProgress{
+		UserHabitID: uh.ID,
+		Value:       value,
+	}
+
+	result := r.db.Create(&ph)
+
+	if result.Error != nil {
+		return "", result.Error
+	}
+
+	return "Progress created successfully", nil
+}
+
+func (r *HabitRepo) UpdateProgress(progressId uint, value float64) (string, error) {
+	var uh model.UserHabit
+	err := r.db.Preload("HabitProgress").Where("id = ?", progressId).First(&uh).Error
+
+	if err != nil {
+		r.logger.Error("failed to get habit progress", err)
+		return "", err
+	}
+
+	ph := model.HabitProgress{}
+	ph.Value = ph.Value + value
+	ph.ID = progressId
+
+	result := r.db.Save(&ph)
+
+	if result.Error != nil {
+		return "", result.Error
+	}
+
+	return "Progress updated successfully", nil
+}
+
+func (r *HabitRepo) GetProgress(userHabitId uint) (float64, error) {
+	var ph model.HabitProgress
+	err := r.db.Where("user_habit_id = ?", userHabitId).First(&ph).Error
+
+	if err != nil {
+		r.logger.Error("failed to get habit progress", err)
+		return 0, err
+	}
+
+	return ph.Value, nil
+}

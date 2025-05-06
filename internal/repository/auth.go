@@ -1,10 +1,12 @@
 package repository
 
 import (
+	"fmt"
 	"math/rand"
 	"routinist/internal/auth"
 	"routinist/internal/domain/errors"
 	"routinist/internal/domain/model"
+	"routinist/internal/dto/request"
 	"routinist/pkg/logger"
 	"time"
 
@@ -23,20 +25,20 @@ func NewAuthRepo(db *gorm.DB, logger *logger.Logger) *AuthRepo {
 	}
 }
 
-func (rp *AuthRepo) Register(e *model.RegisterRequestDTO) (*model.AuthResponseDTO, error) {
+func (rp *AuthRepo) Register(e *request.RegisterRequestDTO) (*request.AuthResponseDTO, error) {
 	// Check if email already exists
 	var user model.User
 
 	result := rp.db.Where("email = ?", e.Email).Limit(1).Find(&user)
 	exists := result.RowsAffected > 0
 	if exists {
-		return &model.AuthResponseDTO{}, errors.ErrEmailAlreadyExists
+		return &request.AuthResponseDTO{}, errors.ErrEmailAlreadyExists
 	}
 
 	// Hash the password
 	hash, err := bcrypt.GenerateFromPassword([]byte(e.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return &model.AuthResponseDTO{}, errors.ErrFailedToHashPassword
+		return &request.AuthResponseDTO{}, errors.ErrFailedToHashPassword
 	}
 
 	// Set default name if not provided
@@ -55,7 +57,7 @@ func (rp *AuthRepo) Register(e *model.RegisterRequestDTO) (*model.AuthResponseDT
 
 	result = rp.db.Create(&user)
 	if result.Error != nil {
-		return &model.AuthResponseDTO{}, result.Error
+		return &request.AuthResponseDTO{}, result.Error
 	}
 
 	rp.logger.Info("User created: ", user)
@@ -65,7 +67,7 @@ func (rp *AuthRepo) Register(e *model.RegisterRequestDTO) (*model.AuthResponseDT
 	habitResult := rp.db.Preload("Units").Where("id = ?", e.HabitID).First(&habit)
 	habitExists := habitResult.RowsAffected > 0
 	if !habitExists {
-		return &model.AuthResponseDTO{}, errors.ErrFailedToGenerateJWT
+		return &request.AuthResponseDTO{}, fmt.Errorf("habit %d does not exist", e.HabitID)
 	}
 
 	rp.logger.Info("Habit found: ", habit.Name)
@@ -81,36 +83,36 @@ func (rp *AuthRepo) Register(e *model.RegisterRequestDTO) (*model.AuthResponseDT
 
 	if err := rp.db.Create(&userHabit).Error; err != nil {
 		rp.logger.Error("Failed to create user habit: ", err)
-		return &model.AuthResponseDTO{}, errors.ErrFailedToAddHabit
+		return &request.AuthResponseDTO{}, errors.ErrFailedToAddHabit
 	}
 
 	rp.logger.Info("User habit created: ", userHabit)
 	token, err := auth.GenerateJWT(user.Email, user.ID)
 	if err != nil {
-		return &model.AuthResponseDTO{}, errors.ErrFailedToGenerateJWT
+		return &request.AuthResponseDTO{}, errors.ErrFailedToGenerateJWT
 	}
 
-	return &model.AuthResponseDTO{Token: token}, nil
+	return &request.AuthResponseDTO{Token: token}, nil
 }
 
-func (rp *AuthRepo) Login(e *model.LoginRequestDTO) (*model.AuthResponseDTO, error) {
+func (rp *AuthRepo) Login(e *request.LoginRequestDTO) (*request.AuthResponseDTO, error) {
 	var user model.User
 	result := rp.db.Where("email = ?", e.Email).Limit(1).Find(&user)
 
 	if result.Error != nil {
-		return &model.AuthResponseDTO{}, errors.ErrInvalidCredentials
+		return &request.AuthResponseDTO{}, errors.ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(e.Password)); err != nil {
-		return &model.AuthResponseDTO{}, errors.ErrInvalidCredentials
+		return &request.AuthResponseDTO{}, errors.ErrInvalidCredentials
 	}
 
 	token, err := auth.GenerateJWT(user.Email, user.ID)
 	if err != nil {
-		return &model.AuthResponseDTO{}, errors.ErrFailedToGenerateJWT
+		return &request.AuthResponseDTO{}, errors.ErrFailedToGenerateJWT
 	}
 
-	return &model.AuthResponseDTO{Token: token}, nil
+	return &request.AuthResponseDTO{Token: token}, nil
 }
 
 // Randomize name consisted of 2 words, 1. Color 2. Animal. Each 20
