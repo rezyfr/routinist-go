@@ -2,14 +2,14 @@ package usecase
 
 import (
 	"fmt"
-	"routinist/internal/domain/model"
 	"routinist/internal/domain/repository"
+	"routinist/internal/dto/request"
 	"routinist/pkg/logger"
 )
 
 type AuthUseCase interface {
-	Login(request *model.LoginRequestDTO) (*model.AuthResponseDTO, error)
-	Register(request *model.RegisterRequestDTO) (*model.AuthResponseDTO, error)
+	Login(request *request.LoginRequestDTO) (*request.AuthResponseDTO, error)
+	Register(request *request.RegisterRequestDTO) (*request.AuthResponseDTO, error)
 }
 
 type authUseCase struct {
@@ -24,7 +24,7 @@ func NewAuthUseCase(r repository.AuthRepository, l *logger.Logger) AuthUseCase {
 	}
 }
 
-func (uc *authUseCase) Register(request *model.RegisterRequestDTO) (*model.AuthResponseDTO, error) {
+func (uc *authUseCase) Register(request *request.RegisterRequestDTO) (*request.AuthResponseDTO, error) {
 
 	token, err := uc.repo.Register(request)
 	if err != nil {
@@ -35,7 +35,7 @@ func (uc *authUseCase) Register(request *model.RegisterRequestDTO) (*model.AuthR
 	return token, nil
 }
 
-func (uc *authUseCase) Login(request *model.LoginRequestDTO) (*model.AuthResponseDTO, error) {
+func (uc *authUseCase) Login(request *request.LoginRequestDTO) (*request.AuthResponseDTO, error) {
 	token, err := uc.repo.Login(request)
 	if err != nil {
 		uc.logger.Error(err)

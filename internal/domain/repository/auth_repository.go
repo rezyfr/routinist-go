@@ -1,10 +1,10 @@
 package repository
 
 import (
-	"routinist/internal/domain/model"
+	"routinist/internal/dto/request"
 )
 
 type AuthRepository interface {
-	Register(e *model.RegisterRequestDTO) (*model.AuthResponseDTO, error)
-	Login(e *model.LoginRequestDTO) (*model.AuthResponseDTO, error)
+	Register(e *request.RegisterRequestDTO) (*request.AuthResponseDTO, error)
+	Login(e *request.LoginRequestDTO) (*request.AuthResponseDTO, error)
 }

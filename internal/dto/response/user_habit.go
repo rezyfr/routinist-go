@@ -1,4 +1,4 @@
-package dto
+package response
 
 import "routinist/internal/domain/model"
 
@@ -10,9 +10,10 @@ type UserHabitDto struct {
 	GoalFrequency model.GoalFrequency `json:"goal_frequency"`
 	Unit          UnitDto             `json:"unit"`
 	UpdatedAt     string              `json:"updated_at"`
+	Progress      float64             `json:"progress"`
 }
 
-func ToUserHabitDto(uh model.UserHabit) UserHabitDto {
+func ToUserHabitDto(uh model.UserHabit, p float64) UserHabitDto {
 	return UserHabitDto{
 		ID:            uh.ID,
 		Name:          uh.Habit.Name,
@@ -21,5 +22,6 @@ func ToUserHabitDto(uh model.UserHabit) UserHabitDto {
 		GoalFrequency: uh.GoalFrequency,
 		Unit:          toUnitDto(uh.Unit),
 		UpdatedAt:     uh.UpdatedAt.String(),
+		Progress:      p,
 	}
 }

@@ -2,10 +2,12 @@ package v1
 
 import (
 	"net/http"
-	"routinist/internal/dto"
+	"routinist/internal/dto/request"
+	"routinist/internal/dto/response"
 	"routinist/internal/middleware"
 	"routinist/internal/usecase"
 	"routinist/pkg/logger"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,44 +28,87 @@ func NewHabitRoutes(handler *gin.RouterGroup, t usecase.HabitUsecase, l logger.I
 	auth := handler.Group("/protected/habit", middleware.JWTAuthMiddleware())
 	{
 		auth.GET("/today", r.getTodayHabits)
+		auth.POST("/:user_habit_id/progress", r.postCreateProgress)
 	}
 }
 
-func (r *HabitHandler) getRandomHabits(c *gin.Context) {
-	response := dto.Response{}
+func (h *HabitHandler) getRandomHabits(c *gin.Context) {
+	r := response.Response{}
 
-	habits, err := r.usecase.GetRandomHabits()
+	habits, err := h.usecase.GetRandomHabits()
 	if err != nil {
-		r.logger.Error(err)
-		response.SetMessage("Failed to get random habits")
-		c.JSON(http.StatusInternalServerError, response)
+		h.logger.Error(err)
+		r.SetMessage("Failed to get random habits")
+		c.JSON(http.StatusInternalServerError, r)
 		return
 	}
 
-	response.Data = habits
-	c.JSON(http.StatusOK, response)
+	r.Data = habits
+	c.JSON(http.StatusOK, r)
 }
 
-func (r *HabitHandler) getTodayHabits(c *gin.Context) {
-	response := dto.Response{}
+func (h *HabitHandler) getTodayHabits(c *gin.Context) {
+	r := response.Response{}
 
-	userIDVal, exists := c.Get("user_id")
-	if !exists {
-		response.SetMessage("Unauthorized")
-		c.JSON(http.StatusUnauthorized, response)
-		return
-	}
+	userIDVal, _ := c.Get("user_id")
 
 	userId := userIDVal.(uint)
 
-	habits, err := r.usecase.GetTodayHabits(userId)
+	habits, err := h.usecase.GetTodayHabits(userId)
 	if err != nil {
-		r.logger.Error(err)
-		response.SetMessage("Failed to get today habits")
-		c.JSON(http.StatusInternalServerError, response)
+		h.logger.Error(err)
+		r.SetMessage("Failed to get today habits")
+		c.JSON(http.StatusInternalServerError, r)
 		return
 	}
 
-	response.Data = habits
-	c.JSON(http.StatusOK, response)
+	r.Data = habits
+	c.JSON(http.StatusOK, r)
+}
+
+func (h *HabitHandler) postCreateProgress(c *gin.Context) {
+	r := response.Response{}
+
+	habitIdVal := c.Param("user_habit_id")
+	if habitIdVal == "" {
+		r.SetMessage("Invalid habit ID")
+		c.JSON(http.StatusBadRequest, r)
+		return
+	}
+
+	habitId, e := strconv.Atoi(habitIdVal)
+
+	if e != nil {
+		r.SetMessage("Invalid habit ID")
+		c.JSON(http.StatusBadRequest, r)
+	}
+
+	userIDVal, _ := c.Get("user_id")
+	userId := userIDVal.(uint)
+
+	var req request.CreateHabitProgressRequestDTO
+
+	if err := c.Bind(&req); err != nil {
+		r.SetMessage("Invalid request")
+		c.JSON(http.StatusBadRequest, r)
+		return
+	}
+
+	if req.Value < 0 || req.Value > 100 {
+		r.SetMessage("Value must be between 0 and 100")
+		c.JSON(http.StatusBadRequest, r)
+		return
+	}
+
+	updatedHabit, err := h.usecase.PostCreateHabitProgress(userId, uint(habitId), req.Value)
+
+	if err != nil {
+		h.logger.Error(err)
+		r.SetMessage("Failed to create habit progress")
+		c.JSON(http.StatusInternalServerError, r)
+		return
+	}
+
+	r.Data = updatedHabit
+	c.JSON(http.StatusOK, r)
 }
