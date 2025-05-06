@@ -1,6 +1,9 @@
 package repository
 
-import "routinist/internal/domain/model"
+import (
+	"routinist/internal/domain/model"
+	"time"
+)
 
 type HabitRepository interface {
 	GetRandomHabits() (*[]model.Habit, error)
@@ -9,4 +12,5 @@ type HabitRepository interface {
 	CreateProgress(userHabitId uint, value float64) (string, error)
 	UpdateProgress(progressId uint, value float64) (string, error)
 	GetProgress(userHabitId uint) (float64, error)
+	GetProgressSummary(userHabitID uint, from, to time.Time) (completed int64, total int64, err error)
 }

@@ -6,12 +6,14 @@ import (
 	"routinist/internal/domain/repository"
 	"routinist/internal/dto/response"
 	"routinist/pkg/logger"
+	"time"
 )
 
 type HabitUsecase interface {
 	GetRandomHabits() (*[]model.Habit, error)
 	GetTodayHabits(userId uint) ([]response.UserHabitDto, error)
 	PostCreateHabitProgress(userId uint, userHabitId uint, value float64) (string, error)
+	GetProgressSummary(userID uint, from, to time.Time) (*response.ProgressSummaryDto, error)
 }
 
 type habitUseCase struct {
@@ -65,4 +67,22 @@ func (uc *habitUseCase) PostCreateHabitProgress(userId uint, userHabitId uint, v
 	ph, e := uc.repo.CreateProgress(uh.ID, value)
 
 	return ph, e
+}
+
+func (uc *habitUseCase) GetProgressSummary(userID uint, from, to time.Time) (*response.ProgressSummaryDto, error) {
+	completed, total, err := uc.repo.GetProgressSummary(userID, from, to)
+	if err != nil {
+		uc.logger.Error(err)
+		return nil, err
+	}
+	percentage := 0.0
+	if total > 0 {
+		percentage = float64(completed) / float64(total) * 100
+	}
+
+	return &response.ProgressSummaryDto{
+		CompletedHabit: float64(completed),
+		TotalHabit:     float64(total),
+		Percentage:     percentage,
+	}, nil
 }
