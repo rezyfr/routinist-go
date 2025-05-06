@@ -27,3 +27,24 @@ func (r *HabitRepo) GetRandomHabits() (*[]model.Habit, error) {
 
 	return &habits, nil
 }
+
+func (r *HabitRepo) GetTodayHabits(userId uint) ([]model.UserHabit, error) {
+	var userHabits []model.UserHabit
+	err := r.db.Preload("Habit").
+		Preload("Unit").
+		Where("user_id = ?", userId).
+		Where("goal_frequency = ?", model.FrequencyDaily).
+		Find(&userHabits).Error
+
+	if err != nil {
+		r.logger.Error("failed to get today habits", err)
+		return nil, err
+	}
+
+	habits := make([]model.UserHabit, 0, len(userHabits))
+	for _, userHabit := range userHabits {
+		habits = append(habits, userHabit)
+	}
+
+	return habits, err
+}
