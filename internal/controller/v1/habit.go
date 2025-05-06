@@ -3,6 +3,7 @@ package v1
 import (
 	"net/http"
 	"routinist/internal/dto"
+	"routinist/internal/middleware"
 	"routinist/internal/usecase"
 	"routinist/pkg/logger"
 
@@ -21,6 +22,11 @@ func NewHabitRoutes(handler *gin.RouterGroup, t usecase.HabitUsecase, l logger.I
 	{
 		h1.GET("/random", r.getRandomHabits)
 	}
+
+	auth := handler.Group("/protected/habit", middleware.JWTAuthMiddleware())
+	{
+		auth.GET("/today", r.getTodayHabits)
+	}
 }
 
 func (r *HabitHandler) getRandomHabits(c *gin.Context) {
@@ -34,5 +40,30 @@ func (r *HabitHandler) getRandomHabits(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"habits": habits})
+	response.Data = habits
+	c.JSON(http.StatusOK, response)
+}
+
+func (r *HabitHandler) getTodayHabits(c *gin.Context) {
+	response := dto.Response{}
+
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		response.SetMessage("Unauthorized")
+		c.JSON(http.StatusUnauthorized, response)
+		return
+	}
+
+	userId := userIDVal.(uint)
+
+	habits, err := r.usecase.GetTodayHabits(userId)
+	if err != nil {
+		r.logger.Error(err)
+		response.SetMessage("Failed to get today habits")
+		c.JSON(http.StatusInternalServerError, response)
+		return
+	}
+
+	response.Data = habits
+	c.JSON(http.StatusOK, response)
 }

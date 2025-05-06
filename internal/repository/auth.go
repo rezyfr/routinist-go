@@ -2,13 +2,12 @@ package repository
 
 import (
 	"math/rand"
-	"os"
+	"routinist/internal/auth"
 	"routinist/internal/domain/errors"
 	"routinist/internal/domain/model"
 	"routinist/pkg/logger"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -86,7 +85,7 @@ func (rp *AuthRepo) Register(e *model.RegisterRequestDTO) (*model.AuthResponseDT
 	}
 
 	rp.logger.Info("User habit created: ", userHabit)
-	token, err := generateJWT(user.Email)
+	token, err := auth.GenerateJWT(user.Email, user.ID)
 	if err != nil {
 		return &model.AuthResponseDTO{}, errors.ErrFailedToGenerateJWT
 	}
@@ -106,22 +105,12 @@ func (rp *AuthRepo) Login(e *model.LoginRequestDTO) (*model.AuthResponseDTO, err
 		return &model.AuthResponseDTO{}, errors.ErrInvalidCredentials
 	}
 
-	token, err := generateJWT(user.Email)
+	token, err := auth.GenerateJWT(user.Email, user.ID)
 	if err != nil {
 		return &model.AuthResponseDTO{}, errors.ErrFailedToGenerateJWT
 	}
 
 	return &model.AuthResponseDTO{Token: token}, nil
-}
-
-func generateJWT(email string) (string, error) {
-	claims := jwt.MapClaims{
-		"email": email,
-		"exp":   time.Now().Add(time.Hour * 72).Unix(),
-	}
-	secret := []byte(os.Getenv("JWT_SECRET"))
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(secret)
 }
 
 // Randomize name consisted of 2 words, 1. Color 2. Animal. Each 20

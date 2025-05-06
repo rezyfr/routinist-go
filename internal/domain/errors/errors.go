@@ -8,4 +8,5 @@ var (
 	ErrFailedToGenerateJWT  = errors.New("failed to generate jwt")
 	ErrFailedToHashPassword = errors.New("failed to hash password")
 	ErrFailedToAddHabit     = errors.New("failed to add habit")
+	ErrUnauthorized         = errors.New("unauthorized")
 )
