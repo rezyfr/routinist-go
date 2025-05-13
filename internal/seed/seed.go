@@ -1,6 +1,7 @@
 package seed
 
 import (
+	"gorm.io/gorm/clause"
 	"routinist/internal/domain/model"
 	"routinist/pkg/logger"
 
@@ -131,7 +132,7 @@ func seedHabitUnits(db *gorm.DB, l *logger.Logger) {
 				DefaultGoal: habit.DefaultGoal,
 			}
 
-			if err := db.Create(&habitUnit).Error; err != nil {
+			if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&habitUnit).Error; err != nil {
 				l.Fatal("failed to seed HabitUnit for habit %d and unit %d: %v", habit.ID, unit.ID, err)
 			}
 		}
