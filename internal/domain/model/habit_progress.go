@@ -3,11 +3,9 @@ package model
 import "time"
 
 type HabitProgress struct {
-	ID          uint `gorm:"primaryKey"`
-	UserHabitID uint
-	Date        time.Time
+	ID          uint      `gorm:"primaryKey;autoIncrement"`
+	UserHabitID uint      `gorm:"index:idx_userhabit_date,unique"`
+	Date        time.Time `gorm:"index:idx_userhabit_date,unique"`
 	Value       float64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
 	IsCompleted bool
 }

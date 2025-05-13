@@ -8,6 +8,7 @@ import (
 	"routinist/internal/usecase"
 	"routinist/pkg/logger"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,6 +30,7 @@ func NewHabitRoutes(handler *gin.RouterGroup, t usecase.HabitUsecase, l logger.I
 	{
 		auth.GET("/today", r.getTodayHabits)
 		auth.POST("/:user_habit_id/progress", r.postCreateProgress)
+		auth.GET("/summary", r.GetSummaryProgress)
 	}
 }
 
@@ -94,8 +96,8 @@ func (h *HabitHandler) postCreateProgress(c *gin.Context) {
 		return
 	}
 
-	if req.Value < 0 || req.Value > 100 {
-		r.SetMessage("Value must be between 0 and 100")
+	if req.Value < 0 {
+		r.SetMessage("Value must be more than 0")
 		c.JSON(http.StatusBadRequest, r)
 		return
 	}
@@ -110,5 +112,45 @@ func (h *HabitHandler) postCreateProgress(c *gin.Context) {
 	}
 
 	r.Data = updatedHabit
+	c.JSON(http.StatusOK, r)
+}
+
+func (h *HabitHandler) GetSummaryProgress(c *gin.Context) {
+	r := response.Response{}
+
+	userIDVal, _ := c.Get("user_id")
+
+	userId := userIDVal.(uint)
+
+	mode := c.DefaultQuery("mode", "today")
+
+	var from, to time.Time
+	now := time.Now()
+	switch mode {
+	case "today":
+		from = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		to = from.Add(24 * time.Hour)
+	case "this_week":
+		weekday := int(now.Weekday())
+		from = time.Date(now.Year(), now.Month(), now.Day()-weekday, 0, 0, 0, 0, now.Location())
+		to = from.AddDate(0, 0, 7)
+	case "this_month":
+		from = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		to = time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, now.Location())
+	default:
+		from = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		to = from.Add(24 * time.Hour)
+	}
+
+	d, e := h.usecase.GetProgressSummary(userId, from, to)
+
+	if e != nil {
+		h.logger.Error(e)
+		r.SetMessage("Failed to get aggregate progress")
+		c.JSON(http.StatusInternalServerError, r)
+		return
+	}
+
+	r.Data = d
 	c.JSON(http.StatusOK, r)
 }

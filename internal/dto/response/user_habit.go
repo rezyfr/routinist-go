@@ -9,11 +9,11 @@ type UserHabitDto struct {
 	Goal          float64             `json:"goal"`
 	GoalFrequency model.GoalFrequency `json:"goal_frequency"`
 	Unit          UnitDto             `json:"unit"`
-	UpdatedAt     string              `json:"updated_at"`
+	CreatedAt     string              `json:"created_at"`
 	Progress      float64             `json:"progress"`
 }
 
-func ToUserHabitDto(uh model.UserHabit, p float64) UserHabitDto {
+func ToUserHabitDto(uh model.UserHabit, p *model.HabitProgress) UserHabitDto {
 	return UserHabitDto{
 		ID:            uh.ID,
 		Name:          uh.Habit.Name,
@@ -21,7 +21,7 @@ func ToUserHabitDto(uh model.UserHabit, p float64) UserHabitDto {
 		Goal:          uh.Goal,
 		GoalFrequency: uh.GoalFrequency,
 		Unit:          toUnitDto(uh.Unit),
-		UpdatedAt:     uh.UpdatedAt.String(),
-		Progress:      p,
+		CreatedAt:     p.Date.String(),
+		Progress:      p.Value,
 	}
 }

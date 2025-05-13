@@ -25,20 +25,20 @@ func NewAuthRepo(db *gorm.DB, logger *logger.Logger) *AuthRepo {
 	}
 }
 
-func (rp *AuthRepo) Register(e *request.RegisterRequestDTO) (*request.AuthResponseDTO, error) {
+func (rp *AuthRepo) Register(e *request.RegisterRequestDTO) (*request.AuthResponseDTO, uint, error) {
 	// Check if email already exists
 	var user model.User
 
 	result := rp.db.Where("email = ?", e.Email).Limit(1).Find(&user)
 	exists := result.RowsAffected > 0
 	if exists {
-		return &request.AuthResponseDTO{}, errors.ErrEmailAlreadyExists
+		return &request.AuthResponseDTO{}, 0, errors.ErrEmailAlreadyExists
 	}
 
 	// Hash the password
 	hash, err := bcrypt.GenerateFromPassword([]byte(e.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return &request.AuthResponseDTO{}, errors.ErrFailedToHashPassword
+		return &request.AuthResponseDTO{}, 0, errors.ErrFailedToHashPassword
 	}
 
 	// Set default name if not provided
@@ -57,42 +57,17 @@ func (rp *AuthRepo) Register(e *request.RegisterRequestDTO) (*request.AuthRespon
 
 	result = rp.db.Create(&user)
 	if result.Error != nil {
-		return &request.AuthResponseDTO{}, result.Error
+		return &request.AuthResponseDTO{}, 0, result.Error
 	}
 
 	rp.logger.Info("User created: ", user)
 
-	// Check if habit valid
-	var habit model.Habit
-	habitResult := rp.db.Preload("Units").Where("id = ?", e.HabitID).First(&habit)
-	habitExists := habitResult.RowsAffected > 0
-	if !habitExists {
-		return &request.AuthResponseDTO{}, fmt.Errorf("habit %d does not exist", e.HabitID)
-	}
-
-	rp.logger.Info("Habit found: ", habit.Name)
-
-	unit := habit.Units[0]
-	// Link habit to user
-	userHabit := model.UserHabit{
-		UserID:  user.ID,
-		HabitID: habit.ID,
-		UnitID:  unit.ID,
-		Goal:    habit.DefaultGoal,
-	}
-
-	if err := rp.db.Create(&userHabit).Error; err != nil {
-		rp.logger.Error("Failed to create user habit: ", err)
-		return &request.AuthResponseDTO{}, errors.ErrFailedToAddHabit
-	}
-
-	rp.logger.Info("User habit created: ", userHabit)
 	token, err := auth.GenerateJWT(user.Email, user.ID)
 	if err != nil {
-		return &request.AuthResponseDTO{}, errors.ErrFailedToGenerateJWT
+		return &request.AuthResponseDTO{}, 0, errors.ErrFailedToGenerateJWT
 	}
 
-	return &request.AuthResponseDTO{Token: token}, nil
+	return &request.AuthResponseDTO{Token: token}, user.ID, nil
 }
 
 func (rp *AuthRepo) Login(e *request.LoginRequestDTO) (*request.AuthResponseDTO, error) {
