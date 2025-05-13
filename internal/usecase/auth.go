@@ -45,13 +45,13 @@ func (uc *authUseCase) Register(request *request.RegisterRequestDTO) (*request.A
 }
 
 func (uc *authUseCase) Login(request *request.LoginRequestDTO) (*request.AuthResponseDTO, error) {
-	token, err := uc.repo.Login(request)
+	token, userId, err := uc.repo.Login(request)
 	if err != nil {
 		uc.logger.Error(err)
 		return token, fmt.Errorf("failed to login: %w", err)
 	}
 
-	err = uc.habitRepo.EnsureTodayProgressForUser(request.Email)
+	err = uc.habitRepo.EnsureTodayProgressForUser(userId)
 	if err != nil {
 		uc.logger.Error(err)
 		return nil, err
