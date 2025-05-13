@@ -13,7 +13,7 @@ type UserHabitDto struct {
 	Progress      float64             `json:"progress"`
 }
 
-func ToUserHabitDto(uh model.UserHabit, p *model.HabitProgress) UserHabitDto {
+func ToUserHabitDto(uh *model.UserHabit, p *model.HabitProgress) UserHabitDto {
 	return UserHabitDto{
 		ID:            uh.ID,
 		Name:          uh.Habit.Name,

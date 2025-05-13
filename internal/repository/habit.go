@@ -110,7 +110,7 @@ func (r *HabitRepo) GetUserHabit(userId uint, userHabitId uint) (*model.UserHabi
 	return &habit, nil
 }
 
-func (r *HabitRepo) CreateProgress(userHabitId uint, value float64) (string, error) {
+func (r *HabitRepo) CreateProgress(userHabitId uint, value float64) (*model.HabitProgress, error) {
 	var uh model.UserHabit
 	err := r.db.Preload("Habit").
 		Where("id = ?", userHabitId).
@@ -118,7 +118,7 @@ func (r *HabitRepo) CreateProgress(userHabitId uint, value float64) (string, err
 
 	if err != nil {
 		r.logger.Error("failed to get habit", err)
-		return "", err
+		return nil, err
 	}
 
 	// If habit has progress, update it
@@ -126,7 +126,12 @@ func (r *HabitRepo) CreateProgress(userHabitId uint, value float64) (string, err
 	exists := r.db.Where("user_habit_id = ?", userHabitId).Find(&p).RowsAffected > 0
 
 	if exists {
-		return r.UpdateProgress(p.ID, value)
+		_, err := r.UpdateProgress(p.ID, value)
+		if err != nil {
+			r.logger.Error("failed to update habit progress", err)
+			return nil, err
+		}
+		return &p, nil
 	}
 
 	ph := model.HabitProgress{
@@ -139,10 +144,10 @@ func (r *HabitRepo) CreateProgress(userHabitId uint, value float64) (string, err
 	result := r.db.Create(&ph)
 
 	if result.Error != nil {
-		return "", result.Error
+		return nil, result.Error
 	}
 
-	return "Progress created successfully", nil
+	return &ph, nil
 }
 
 func (r *HabitRepo) UpdateProgress(progressId uint, value float64) (string, error) {
@@ -220,12 +225,12 @@ func (r *HabitRepo) GetProgressSummary(userId uint, from, to time.Time) (complet
 	return
 }
 
-func (r *HabitRepo) EnsureTodayProgressForUser(email string) error {
+func (r *HabitRepo) EnsureTodayProgressForUser(userId uint) error {
 	today := time.Now().Truncate(24 * time.Hour)
 	var user model.User
 	var userHabits []model.UserHabit
 
-	if err := r.db.Where("email = ?", email).First(&user).Error; err != nil {
+	if err := r.db.Where("id = ?", userId).First(&user).Error; err != nil {
 		r.logger.Error("failed to get user", err)
 		return err
 	}

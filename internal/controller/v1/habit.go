@@ -28,10 +28,39 @@ func NewHabitRoutes(handler *gin.RouterGroup, t usecase.HabitUsecase, l logger.I
 
 	auth := handler.Group("/protected/habit", middleware.JWTAuthMiddleware())
 	{
+		auth.POST("/create", r.createUserHabit)
 		auth.GET("/today", r.getTodayHabits)
 		auth.POST("/:user_habit_id/progress", r.postCreateProgress)
 		auth.GET("/summary", r.GetSummaryProgress)
 	}
+}
+
+func (h *HabitHandler) createUserHabit(c *gin.Context) {
+	r := response.Response{}
+
+	userIDVal, _ := c.Get("user_id")
+	userId := userIDVal.(uint)
+
+	var req request.CreateUserHabitRequestDTO
+
+	if err := c.Bind(&req); err != nil {
+		r.SetMessage("Invalid request")
+		c.JSON(http.StatusBadRequest, r)
+		return
+	}
+
+	_, err := h.usecase.CreateUserHabit(userId, req.HabitId, &req.UnitId, &req.Goal)
+
+	if err != nil {
+		h.logger.Error(err)
+		r.SetMessage("Failed to create user habit")
+		c.JSON(http.StatusInternalServerError, r)
+	}
+
+	r.Data = "User habit created successfully"
+
+	c.JSON(http.StatusOK, r)
+	return
 }
 
 func (h *HabitHandler) getRandomHabits(c *gin.Context) {

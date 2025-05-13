@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"fmt"
 	"math/rand"
 	"routinist/internal/auth"
 	"routinist/internal/domain/errors"
@@ -70,24 +69,24 @@ func (rp *AuthRepo) Register(e *request.RegisterRequestDTO) (*request.AuthRespon
 	return &request.AuthResponseDTO{Token: token}, user.ID, nil
 }
 
-func (rp *AuthRepo) Login(e *request.LoginRequestDTO) (*request.AuthResponseDTO, error) {
+func (rp *AuthRepo) Login(e *request.LoginRequestDTO) (*request.AuthResponseDTO, uint, error) {
 	var user model.User
 	result := rp.db.Where("email = ?", e.Email).Limit(1).Find(&user)
 
 	if result.Error != nil {
-		return &request.AuthResponseDTO{}, errors.ErrInvalidCredentials
+		return &request.AuthResponseDTO{}, 0, errors.ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(e.Password)); err != nil {
-		return &request.AuthResponseDTO{}, errors.ErrInvalidCredentials
+		return &request.AuthResponseDTO{}, 0, errors.ErrInvalidCredentials
 	}
 
 	token, err := auth.GenerateJWT(user.Email, user.ID)
 	if err != nil {
-		return &request.AuthResponseDTO{}, errors.ErrFailedToGenerateJWT
+		return &request.AuthResponseDTO{}, 0, errors.ErrFailedToGenerateJWT
 	}
 
-	return &request.AuthResponseDTO{Token: token}, nil
+	return &request.AuthResponseDTO{Token: token}, user.ID, nil
 }
 
 // Randomize name consisted of 2 words, 1. Color 2. Animal. Each 20

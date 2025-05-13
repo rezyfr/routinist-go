@@ -10,6 +10,7 @@ import (
 )
 
 type HabitUsecase interface {
+	CreateUserHabit(userId uint, habitId uint, unitId *uint, goal *float64) (string, error)
 	GetRandomHabits() (*[]model.Habit, error)
 	GetTodayHabits(userId uint) ([]response.UserHabitDto, error)
 	PostCreateHabitProgress(userId uint, userHabitId uint, value float64) (string, error)
@@ -25,6 +26,22 @@ func NewHabitUseCase(r repository.HabitRepository, l *logger.Logger) HabitUsecas
 	return &habitUseCase{r, l}
 }
 
+func (uc *habitUseCase) CreateUserHabit(userId uint, habitId uint, unitId *uint, goal *float64) (string, error) {
+	uh, err := uc.repo.CreateUserHabit(userId, habitId, unitId, goal)
+	if err != nil {
+		uc.logger.Error(err)
+		return "", fmt.Errorf("failed to create habit: %w", err)
+	}
+
+	err = uc.repo.EnsureTodayProgressForUser(uh.UserID)
+
+	if err != nil {
+		uc.logger.Error(err)
+		return "", fmt.Errorf("failed to create habit progress: %w", err)
+	}
+
+	return "success to create user habit", err
+}
 func (uc *habitUseCase) GetRandomHabits() (*[]model.Habit, error) {
 	habits, err := uc.repo.GetRandomHabits()
 	if err != nil {
@@ -52,7 +69,7 @@ func (uc *habitUseCase) GetTodayHabits(userId uint) ([]response.UserHabitDto, er
 			uc.logger.Error(err)
 			return nil, fmt.Errorf("failed to get habit progress: %w", err)
 		}
-		result = append(result, response.ToUserHabitDto(u, p))
+		result = append(result, response.ToUserHabitDto(&u, p))
 	}
 	return result, nil
 }
@@ -65,9 +82,14 @@ func (uc *habitUseCase) PostCreateHabitProgress(userId uint, userHabitId uint, v
 		return "", fmt.Errorf("failed to get habit: %w", err)
 	}
 
-	ph, e := uc.repo.CreateProgress(uh.ID, value)
+	_, e := uc.repo.CreateProgress(uh.ID, value)
 
-	return ph, e
+	if e != nil {
+		uc.logger.Error(e)
+		return "", fmt.Errorf("failed to create habit progress: %w", e)
+	}
+
+	return "success to create habit progress", e
 }
 
 func (uc *habitUseCase) GetProgressSummary(userID uint, from, to time.Time) (*response.ProgressSummaryDto, error) {
