@@ -3,6 +3,7 @@ package v1
 import (
 	"errors"
 	"net/http"
+	"routinist/internal/auth"
 	domainErr "routinist/internal/domain/errors"
 	"routinist/internal/dto/request"
 	"routinist/internal/dto/response"
@@ -25,6 +26,7 @@ func NewAuthRoutes(handler *gin.RouterGroup, t usecase.AuthUseCase, l logger.Int
 	{
 		h1.POST("/register", r.register)
 		h1.POST("/login", r.login)
+		h1.GET("/check", r.CheckToken)
 	}
 }
 
@@ -107,4 +109,20 @@ func (h *AuthHandler) login(c *gin.Context) {
 
 	r.Data = token
 	c.JSON(http.StatusOK, r)
+}
+
+func (h *AuthHandler) CheckToken(c *gin.Context) {
+	tokenStr := c.GetHeader("Authorization")
+	if tokenStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Missing token"})
+		return
+	}
+
+	claims, err := auth.CheckToken(tokenStr)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid or expired token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Token valid", "user_id": claims.ID})
 }

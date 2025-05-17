@@ -123,9 +123,13 @@ func (r *HabitRepo) CreateProgress(userHabitId uint, value float64) (*model.Habi
 
 	// If habit has progress, update it
 	p := model.HabitProgress{}
-	exists := r.db.Where("user_habit_id = ?", userHabitId).Find(&p).RowsAffected > 0
+	exists := r.db.
+		Where("user_habit_id = ?", userHabitId).
+		Where("date = ?", time.Now().Truncate(24*time.Hour)).
+		Find(&p).RowsAffected > 0
 
 	if exists {
+		r.logger.Info("habit progress already exists for today, updating it, id = ", p.ID, " value = ", value, "")
 		_, err := r.UpdateProgress(p.ID, value)
 		if err != nil {
 			r.logger.Error("failed to update habit progress", err)
