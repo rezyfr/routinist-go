@@ -30,6 +30,7 @@ func JWTAuthMiddleware() gin.HandlerFunc {
 		// Attach user ID or email to context
 		c.Set("user_id", claims.ID)
 		c.Set("email", claims.Email)
+		c.Set("expired_at", claims.ExpiresAt.Time)
 
 		c.Next()
 	}

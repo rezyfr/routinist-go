@@ -3,13 +3,14 @@ package v1
 import (
 	"errors"
 	"net/http"
-	"routinist/internal/auth"
 	domainErr "routinist/internal/domain/errors"
 	"routinist/internal/dto/request"
 	"routinist/internal/dto/response"
+	"routinist/internal/middleware"
 	"routinist/internal/usecase"
 	"routinist/pkg/logger"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,7 +27,11 @@ func NewAuthRoutes(handler *gin.RouterGroup, t usecase.AuthUseCase, l logger.Int
 	{
 		h1.POST("/register", r.register)
 		h1.POST("/login", r.login)
-		h1.GET("/check", r.CheckToken)
+	}
+
+	h2 := handler.Group("/auth/protected", middleware.JWTAuthMiddleware())
+	{
+		h2.GET("/check", r.CheckToken)
 	}
 }
 
@@ -112,17 +117,18 @@ func (h *AuthHandler) login(c *gin.Context) {
 }
 
 func (h *AuthHandler) CheckToken(c *gin.Context) {
-	tokenStr := c.GetHeader("Authorization")
-	if tokenStr == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Missing token"})
-		return
-	}
+	expiredAt, exist := c.Get("expired_at")
 
-	claims, err := auth.CheckToken(tokenStr)
-	if err != nil {
+	if !exist {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid or expired token"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Token valid", "user_id": claims.ID})
+	// Check expiration
+	if expiredAt != nil && expiredAt.(time.Time).Before(time.Now()) {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid or expired token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Token valid"})
 }
