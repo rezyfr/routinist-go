@@ -118,17 +118,21 @@ func (h *AuthHandler) login(c *gin.Context) {
 
 func (h *AuthHandler) CheckToken(c *gin.Context) {
 	expiredAt, exist := c.Get("expired_at")
+	r := response.Response{}
 
 	if !exist {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid or expired token"})
+		r.SetMessage("Invalid or expired token")
+		c.JSON(http.StatusUnauthorized, r)
 		return
 	}
 
 	// Check expiration
 	if expiredAt != nil && expiredAt.(time.Time).Before(time.Now()) {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid or expired token"})
+		r.SetMessage("Invalid or expired token")
+		c.JSON(http.StatusUnauthorized, r)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Token valid"})
+	r.Data = "Token valid"
+	c.JSON(http.StatusOK, r)
 }
