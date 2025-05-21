@@ -2,7 +2,7 @@ package usecase
 
 import (
 	"fmt"
-	"routinist/internal/domain/model"
+	"math/rand"
 	"routinist/internal/domain/repository"
 	"routinist/internal/dto/response"
 	"routinist/pkg/logger"
@@ -11,7 +11,7 @@ import (
 
 type HabitUsecase interface {
 	CreateUserHabit(userId uint, habitId uint, unitId *uint, goal *float64) (string, error)
-	GetRandomHabits() (*[]model.Habit, error)
+	GetRandomHabits() (*[]response.HabitDto, error)
 	GetTodayHabits(userId uint) ([]response.UserHabitDto, error)
 	PostCreateHabitProgress(userId uint, userHabitId uint, value float64) (string, error)
 	GetProgressSummary(userID uint, from, to time.Time) (*response.ProgressSummaryDto, error)
@@ -42,14 +42,20 @@ func (uc *habitUseCase) CreateUserHabit(userId uint, habitId uint, unitId *uint,
 
 	return "success to create user habit", err
 }
-func (uc *habitUseCase) GetRandomHabits() (*[]model.Habit, error) {
+func (uc *habitUseCase) GetRandomHabits() (*[]response.HabitDto, error) {
 	habits, err := uc.repo.GetRandomHabits()
+	var result []response.HabitDto
+
 	if err != nil {
 		uc.logger.Error(err)
 		return nil, fmt.Errorf("failed to get random habits: %w", err)
 	}
 
-	return habits, nil
+	for _, h := range *habits {
+		result = append(result, response.ToHabitDto(h, generateRandomColor()))
+	}
+
+	return &result, nil
 }
 
 func (uc *habitUseCase) GetTodayHabits(userId uint) ([]response.UserHabitDto, error) {
@@ -108,4 +114,16 @@ func (uc *habitUseCase) GetProgressSummary(userID uint, from, to time.Time) (*re
 		TotalHabit:     float64(total),
 		Percentage:     percentage,
 	}, nil
+}
+
+func generateRandomColor() float64 {
+	colors := []float64{
+		0xFFFFFFFF, 0xFFFCDCD3, 0xFFD7D9FF, 0xFFBBE5FA, 0xFFF7CECD,
+		0xFFFFE6B6, 0xFFC3EBC0, 0xFFE8D3FF, 0xFFD5ECE0,
+	}
+
+	rand.Seed(time.Now().UnixNano())
+	color := colors[rand.Intn(len(colors))]
+
+	return color
 }
