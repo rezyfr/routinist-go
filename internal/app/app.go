@@ -47,10 +47,11 @@ func Run() {
 	router := gin.Default()
 	authRepo := repository.NewAuthRepo(dbpool, l)
 	habitRepo := repository.NewHabitRepo(dbpool, l)
+	userRepo := repository.NewUserRepo(dbpool, l)
 
 	// Initialize usecase
 	authUseCase := usecase.NewAuthUseCase(authRepo, habitRepo, l)
-	habitUseCase := usecase.NewHabitUseCase(habitRepo, l)
+	habitUseCase := usecase.NewHabitUseCase(habitRepo, userRepo, l)
 
 	// Setup routes
 	http.NewRouter(router, l, authUseCase, habitUseCase)
