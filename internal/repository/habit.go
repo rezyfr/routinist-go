@@ -130,12 +130,12 @@ func (r *HabitRepo) CreateProgress(userHabitId uint, value float64) (*model.Habi
 
 	if exists {
 		r.logger.Info("habit progress already exists for today, updating it, id = ", p.ID, " value = ", value, "")
-		_, err := r.UpdateProgress(p.ID, value)
+		ph, err := r.UpdateProgress(p.ID, value)
 		if err != nil {
 			r.logger.Error("failed to update habit progress", err)
 			return nil, err
 		}
-		return &p, nil
+		return ph, nil
 	}
 
 	ph := model.HabitProgress{
@@ -154,20 +154,20 @@ func (r *HabitRepo) CreateProgress(userHabitId uint, value float64) (*model.Habi
 	return &ph, nil
 }
 
-func (r *HabitRepo) UpdateProgress(progressId uint, value float64) (string, error) {
+func (r *HabitRepo) UpdateProgress(progressId uint, value float64) (*model.HabitProgress, error) {
 	var ph model.HabitProgress
 	err := r.db.Where("id = ?", progressId).First(&ph).Error
 
 	if err != nil {
 		r.logger.Error("failed to get habit progress", err)
-		return "", err
+		return nil, err
 	}
 
 	var uh model.UserHabit
 	err = r.db.Where("id = ?", ph.UserHabitID).First(&uh).Error
 	if err != nil {
 		r.logger.Error("failed to get user habit", err)
-		return "", err
+		return nil, err
 	}
 
 	ph.IsCompleted = ph.Value+value >= uh.Goal
@@ -177,10 +177,10 @@ func (r *HabitRepo) UpdateProgress(progressId uint, value float64) (string, erro
 
 	if result.Error != nil {
 		r.logger.Error("failed to update habit progress", result.Error)
-		return "", result.Error
+		return nil, result.Error
 	}
 
-	return "Progress updated successfully", nil
+	return &ph, nil
 }
 
 func (r *HabitRepo) GetProgress(userHabitId uint) (float64, error) {
@@ -276,4 +276,37 @@ func (r *HabitRepo) GetTodayHabitProgress(userHabitId uint) (*model.HabitProgres
 	}
 
 	return &habits, nil
+}
+
+func (r *HabitRepo) GetActivitySummary(userId uint, userHabitId uint, from, to time.Time) (completed int64, total int64, failed int64, err error) {
+	var progresses []model.HabitProgress
+
+	q := r.db.Where("date BETWEEN ? AND ?", from, to)
+
+	if userHabitId == 0 {
+		// Get all user_habit IDs for the user
+		var pIds []uint
+		r.db.Model(&model.UserHabit{}).Where("user_id = ?", userId).Pluck("id", &pIds)
+		if len(pIds) == 0 {
+			return 0, 0, 0, nil // no habits
+		}
+		q = q.Where("user_habit_id IN ?", pIds)
+	} else {
+		q = q.Where("user_habit_id = ?", userHabitId)
+	}
+
+	if err = q.Find(&progresses).Error; err != nil {
+		return 0, 0, 0, err
+	}
+
+	var completedCount, failedCount int64
+	for _, log := range progresses {
+		if log.IsCompleted {
+			completedCount++
+		} else {
+			failedCount++
+		}
+	}
+
+	return completedCount, int64(len(progresses)), failedCount, nil
 }

@@ -15,6 +15,7 @@ type HabitUsecase interface {
 	GetTodayHabits(userId uint) ([]response.UserHabitDto, error)
 	PostCreateHabitProgress(userId uint, userHabitId uint, value float64) (*response.CreateProgressDto, error)
 	GetProgressSummary(userID uint, from, to time.Time) (*response.ProgressSummaryDto, error)
+	GetActivitySummary(userID uint, userHabitId uint, from, to time.Time) (*response.ActivitySummaryDto, error)
 }
 
 type habitUseCase struct {
@@ -126,6 +127,42 @@ func (uc *habitUseCase) GetProgressSummary(userID uint, from, to time.Time) (*re
 		CompletedHabit: float64(completed),
 		TotalHabit:     float64(total),
 		Percentage:     percentage,
+	}, nil
+}
+
+func (uc *habitUseCase) GetActivitySummary(userID uint, userHabitId uint, from, to time.Time) (*response.ActivitySummaryDto, error) {
+	var habitName string
+	var habitId uint
+
+	completed, total, failed, err := uc.repo.GetActivitySummary(userID, userHabitId, from, to)
+	if err != nil {
+		uc.logger.Error(err)
+		return nil, err
+	}
+
+	if userHabitId != 0 {
+		uh, err := uc.repo.GetUserHabit(userID, userHabitId)
+
+		if err != nil {
+			uc.logger.Error(err)
+			return nil, err
+		}
+
+		habitName = uh.Habit.Name
+		habitId = uh.HabitID
+	}
+
+	percentage := 0.0
+	if total > 0 {
+		percentage = float64(completed) / float64(total) * 100
+	}
+
+	return &response.ActivitySummaryDto{
+		SuccessRate:   percentage,
+		Completed:     uint(completed),
+		Failed:        uint(failed),
+		UserHabitName: habitName,
+		UserHabitId:   habitId,
 	}, nil
 }
 

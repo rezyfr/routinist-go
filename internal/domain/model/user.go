@@ -13,7 +13,7 @@ type User struct {
 	Name       string      `gorm:"not null" json:"name"`
 	Gender     string      `gorm:"not null" json:"gender"`
 	UserHabits []UserHabit `gorm:"foreignKey:UserID"`
-	Milestone  uint        `json:"milestone"`
+	Milestone  uint        `json:"milestone" gorm:"default:0;not null"`
 }
 
 type Gender string

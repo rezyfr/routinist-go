@@ -24,7 +24,9 @@ func (rp *UserRepo) UpdateMilestone(userId uint, milestone uint) (uint, error) {
 		return 0, err
 	}
 
+	rp.logger.Info("User milestone before update: ", user)
 	user.Milestone = user.Milestone + milestone
+	rp.logger.Info("User milestone updated: ", user)
 	err = rp.db.Save(&user).Error
 	if err != nil {
 		return 0, err

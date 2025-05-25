@@ -11,9 +11,10 @@ type HabitRepository interface {
 	GetTodayHabits(userId uint) ([]model.UserHabit, error)
 	GetUserHabit(userId uint, userHabitId uint) (*model.UserHabit, error)
 	CreateProgress(userHabitId uint, value float64) (*model.HabitProgress, error)
-	UpdateProgress(progressId uint, value float64) (string, error)
+	UpdateProgress(progressId uint, value float64) (*model.HabitProgress, error)
 	GetProgress(userHabitId uint) (float64, error)
 	GetProgressSummary(userHabitID uint, from, to time.Time) (completed int64, total int64, err error)
 	EnsureTodayProgressForUser(userId uint) error
 	GetTodayHabitProgress(userHabitId uint) (*model.HabitProgress, error)
+	GetActivitySummary(userId uint, userHabitId uint, from, to time.Time) (completed int64, total int64, failed int64, err error)
 }

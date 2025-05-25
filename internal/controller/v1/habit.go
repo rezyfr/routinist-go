@@ -31,7 +31,8 @@ func NewHabitRoutes(handler *gin.RouterGroup, t usecase.HabitUsecase, l logger.I
 		auth.POST("/create", r.createUserHabit)
 		auth.GET("/today", r.getTodayHabits)
 		auth.POST("/:user_habit_id/progress", r.postCreateProgress)
-		auth.GET("/summary", r.GetSummaryProgress)
+		auth.GET("/progress-summary", r.GetSummaryProgress)
+		auth.POST("/activity-summary", r.GetActivitySummary)
 	}
 }
 
@@ -181,5 +182,31 @@ func (h *HabitHandler) GetSummaryProgress(c *gin.Context) {
 	}
 
 	r.Data = d
+	c.JSON(http.StatusOK, r)
+}
+
+func (h *HabitHandler) GetActivitySummary(c *gin.Context) {
+	r := response.Response{}
+	var req request.GetActivitySummaryRequest
+
+	if err := c.Bind(&req); err != nil {
+		r.SetMessage("Invalid request")
+		c.JSON(http.StatusBadRequest, r)
+		return
+	}
+
+	userIDVal, _ := c.Get("user_id")
+	userId := userIDVal.(uint)
+
+	activitySummary, err := h.usecase.GetActivitySummary(userId, req.UserHabitId, req.From, req.To)
+
+	if err != nil {
+		h.logger.Error(err)
+		r.SetMessage("Failed to get activity summary")
+		c.JSON(http.StatusInternalServerError, r)
+		return
+	}
+
+	r.Data = activitySummary
 	c.JSON(http.StatusOK, r)
 }
