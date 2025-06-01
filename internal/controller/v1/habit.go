@@ -33,6 +33,7 @@ func NewHabitRoutes(handler *gin.RouterGroup, t usecase.HabitUsecase, l logger.I
 		auth.POST("/:user_habit_id/progress", r.postCreateProgress)
 		auth.GET("/progress-summary", r.GetSummaryProgress)
 		auth.POST("/activity-summary", r.GetActivitySummary)
+		auth.POST("/stats/daily", r.GetUserHabitDailyStats)
 		auth.GET("/user-habits", r.GetUserHabits)
 	}
 }
@@ -228,5 +229,31 @@ func (h *HabitHandler) GetUserHabits(c *gin.Context) {
 	}
 
 	r.Data = habits
+	c.JSON(http.StatusOK, r)
+}
+
+func (h *HabitHandler) GetUserHabitDailyStats(c *gin.Context) {
+	r := response.Response{}
+	var req request.GetActivitySummaryRequest
+
+	if err := c.Bind(&req); err != nil {
+		r.SetMessage("Invalid request")
+		c.JSON(http.StatusBadRequest, r)
+		return
+	}
+
+	userIDVal, _ := c.Get("user_id")
+	userId := userIDVal.(uint)
+
+	activitySummary, err := h.usecase.GetUserHabitDailyStats(userId, req.From, req.To)
+
+	if err != nil {
+		h.logger.Error(err)
+		r.SetMessage("Failed to get daily stats")
+		c.JSON(http.StatusInternalServerError, r)
+		return
+	}
+
+	r.Data = activitySummary
 	c.JSON(http.StatusOK, r)
 }

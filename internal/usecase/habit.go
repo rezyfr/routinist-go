@@ -18,6 +18,7 @@ type HabitUsecase interface {
 	GetProgressSummary(userID uint, from, to time.Time) (*response.ProgressSummaryDto, error)
 	GetActivitySummary(userID uint, userHabitId uint, from, to time.Time) (*response.ActivitySummaryDto, error)
 	GetUserHabits(userId uint) ([]response.UserHabitDto, error)
+	GetUserHabitDailyStats(userID uint, from, to time.Time) ([]response.DailyHabitStat, error)
 }
 
 type habitUseCase struct {
@@ -136,11 +137,21 @@ func (uc *habitUseCase) GetActivitySummary(userID uint, userHabitId uint, from, 
 	var habitName string
 	var habitId uint
 	var habitIcon string
+	var completedCount, failedCount int64
 
-	completed, total, failed, err := uc.repo.GetActivitySummary(userID, userHabitId, from, to)
+	hp, err := uc.repo.GetUserHabitProgresses(userID, userHabitId, from, to)
+
 	if err != nil {
 		uc.logger.Error(err)
 		return nil, err
+	}
+
+	for _, log := range hp {
+		if log.IsCompleted {
+			completedCount++
+		} else {
+			failedCount++
+		}
 	}
 
 	if userHabitId != 0 {
@@ -157,14 +168,15 @@ func (uc *habitUseCase) GetActivitySummary(userID uint, userHabitId uint, from, 
 	}
 
 	percentage := 0.0
-	if total > 0 {
-		percentage = float64(completed) / float64(total) * 100
+	completed := len(hp)
+	if completed > 0 {
+		percentage = float64(completedCount) / float64(completed) * 100
 	}
 
 	return &response.ActivitySummaryDto{
 		SuccessRate:   util.RoundFloat(percentage, 2),
 		Completed:     uint(completed),
-		Failed:        uint(failed),
+		Failed:        uint(failedCount),
 		UserHabitName: habitName,
 		UserHabitId:   habitId,
 		UserHabitIcon: habitIcon,
@@ -186,6 +198,49 @@ func (uc *habitUseCase) GetUserHabits(userId uint) ([]response.UserHabitDto, err
 	}
 
 	return result, nil
+}
+
+func (uc *habitUseCase) GetUserHabitDailyStats(userID uint, from, to time.Time) ([]response.DailyHabitStat, error) {
+	hp, err := uc.repo.GetUserHabitProgresses(userID, 0, from, to)
+
+	if err != nil {
+		uc.logger.Error(err)
+		return nil, err
+	}
+
+	start := from
+	chartMap := map[string]*response.DailyHabitStat{}
+	for i := 0; i < 7; i++ {
+		day := start.AddDate(0, 0, i)
+		key := day.Format("2006-01-02")
+		chartMap[key] = &response.DailyHabitStat{
+			Date:    day,
+			Total:   0,
+			Success: 0,
+		}
+	}
+	// populate stats
+	for _, prog := range hp {
+		key := prog.Date.Format("2006-01-02")
+		stat, exists := chartMap[key]
+		if !exists {
+			// Shouldn't happen, but guard just in case
+			continue
+		}
+		stat.Total++
+		if prog.IsCompleted {
+			stat.Success++
+		}
+	}
+	// build ordered slice for output
+	dailyStats := make([]response.DailyHabitStat, 0, 7)
+	for i := 0; i < 7; i++ {
+		day := start.AddDate(0, 0, i)
+		key := day.Format("2006-01-02")
+		dailyStats = append(dailyStats, *chartMap[key])
+	}
+
+	return dailyStats, nil
 }
 
 func generateRandomColor() float64 {

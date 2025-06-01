@@ -278,37 +278,24 @@ func (r *HabitRepo) GetTodayHabitProgress(userHabitId uint) (*model.HabitProgres
 	return &habits, nil
 }
 
-func (r *HabitRepo) GetActivitySummary(userId uint, userHabitId uint, from, to time.Time) (completed int64, total int64, failed int64, err error) {
+func (r *HabitRepo) GetUserHabitProgresses(userId uint, userHabitId uint, from, to time.Time) ([]model.HabitProgress, error) {
 	var progresses []model.HabitProgress
-
-	q := r.db.Where("date BETWEEN ? AND ?", from, to)
+	var q *gorm.DB
 
 	if userHabitId == 0 {
 		// Get all user_habit IDs for the user
 		var pIds []uint
 		r.db.Model(&model.UserHabit{}).Where("user_id = ?", userId).Pluck("id", &pIds)
-		if len(pIds) == 0 {
-			return 0, 0, 0, nil // no habits
-		}
-		q = q.Where("user_habit_id IN ?", pIds)
+		q = r.db.Where("user_habit_id IN ?", pIds).Where("date BETWEEN ? AND ?", from, to)
 	} else {
-		q = q.Where("user_habit_id = ?", userHabitId)
+		q = r.db.Where("user_habit_id = ?", userHabitId).Where("date BETWEEN ? AND ?", from, to)
 	}
 
-	if err = q.Find(&progresses).Error; err != nil {
-		return 0, 0, 0, err
+	if err := q.Find(&progresses).Error; err != nil {
+		return nil, err
 	}
 
-	var completedCount, failedCount int64
-	for _, log := range progresses {
-		if log.IsCompleted {
-			completedCount++
-		} else {
-			failedCount++
-		}
-	}
-
-	return completedCount, int64(len(progresses)), failedCount, nil
+	return progresses, nil
 }
 
 func (r *HabitRepo) GetUserHabits(userId uint) ([]*model.UserHabit, error) {
