@@ -86,12 +86,7 @@ func (r *HabitRepo) GetTodayHabits(userId uint) ([]model.UserHabit, error) {
 		return nil, err
 	}
 
-	habits := make([]model.UserHabit, 0, len(userHabits))
-	for _, userHabit := range userHabits {
-		habits = append(habits, userHabit)
-	}
-
-	return habits, err
+	return userHabits, err
 }
 
 func (r *HabitRepo) GetUserHabit(userId uint, userHabitId uint) (*model.UserHabit, error) {
@@ -123,12 +118,10 @@ func (r *HabitRepo) CreateProgress(userHabitId uint, value float64) (*model.Habi
 
 	// If habit has progress, update it
 	p := model.HabitProgress{}
-	exists := r.db.
-		Where("user_habit_id = ?", userHabitId).
-		Where("date = ?", time.Now().Truncate(24*time.Hour)).
-		Find(&p).RowsAffected > 0
+	today := time.Now().Truncate(24 * time.Hour)
+	err = r.db.Where("user_habit_id = ? AND date = ?", userHabitId, today).First(&p).Error
 
-	if exists {
+	if err == nil {
 		r.logger.Info("habit progress already exists for today, updating it, id = ", p.ID, " value = ", value, "")
 		ph, err := r.UpdateProgress(p.ID, value)
 		if err != nil {
@@ -171,7 +164,7 @@ func (r *HabitRepo) UpdateProgress(progressId uint, value float64) (*model.Habit
 	}
 
 	ph.IsCompleted = ph.Value+value >= uh.Goal
-	ph.Value = ph.Value + value
+	ph.Value += value
 
 	result := r.db.Save(&ph)
 
@@ -199,68 +192,65 @@ func (r *HabitRepo) GetProgress(userHabitId uint) (float64, error) {
 }
 
 func (r *HabitRepo) GetProgressSummary(userId uint, from, to time.Time) (completed int64, total int64, err error) {
-	// Total habit progress in range for user
-	var debugTotal int64
-	r.db.
-		Model(&model.HabitProgress{}).
-		Joins("JOIN user_habits ON habit_progresses.user_habit_id = user_habits.id").
-		Where("user_habits.user_id = ? AND habit_progresses.date >= ? AND habit_progresses.date < ?", userId, from, to).Count(&debugTotal)
+	type SummaryResult struct {
+		Total     int64
+		Completed int64
+	}
+	var result SummaryResult
 
-	r.logger.Info("Total habit progress in range for user: ", debugTotal)
 	err = r.db.
 		Model(&model.HabitProgress{}).
-		Joins("JOIN user_habits ON habit_progresses.user_habit_id = user_habits.id").
+		Select(`
+			COUNT(*) AS total,
+			SUM(CASE WHEN is_completed THEN 1 ELSE 0 END) AS completed
+		`).
+		Joins("JOIN user_habits ON user_habits.id = habit_progresses.user_habit_id").
 		Where("user_habits.user_id = ? AND habit_progresses.date >= ? AND habit_progresses.date < ?", userId, from, to).
-		Count(&total).Error
+		Scan(&result).Error
 
 	if err != nil {
 		r.logger.Error("failed to get habit progress summary", err)
 		return
 	}
-	// Completed ones
-	err = r.db.
-		Model(&model.HabitProgress{}).
-		Joins("JOIN user_habits ON habit_progresses.user_habit_id = user_habits.id").
-		Where("user_habits.user_id = ? AND habit_progresses.is_completed = ? AND habit_progresses.date >= ? AND habit_progresses.date < ?", userId, true, from, to).
-		Count(&completed).Error
-	if err != nil {
-		r.logger.Error("failed to get habit progress summary", err)
-	}
-	return
+
+	return result.Completed, result.Total, nil
 }
 
 func (r *HabitRepo) EnsureTodayProgressForUser(userId uint) error {
 	today := time.Now().Truncate(24 * time.Hour)
-	var user model.User
+
 	var userHabits []model.UserHabit
-
-	if err := r.db.Where("id = ?", userId).First(&user).Error; err != nil {
-		r.logger.Error("failed to get user", err)
+	if err := r.db.Where("user_id = ?", userId).Find(&userHabits).Error; err != nil {
 		return err
 	}
 
-	if err := r.db.Where("user_id = ?", user.ID).Find(&userHabits).Error; err != nil {
-		r.logger.Error("failed to get user habits", err)
-		return err
+	if len(userHabits) == 0 {
+		return nil
 	}
+
+	var records []model.HabitProgress
 	for _, uh := range userHabits {
-		for i := 0; i < 7; i++ { // For multiple days if needed
-			d := today.AddDate(0, 0, i)
-			// Ensure d is always truncated to midnight!
-			d = d.Truncate(24 * time.Hour)
-			hp := model.HabitProgress{
-				UserHabitID: uh.ID,
-				Date:        d,
-				Value:       0,
-				IsCompleted: false,
-			}
-			err := r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&hp).Error
-			if err != nil {
-				r.logger.Error("failed to ensure progress for user habit", err)
-				return err
-			}
-		}
+		records = append(records, model.HabitProgress{
+			UserHabitID: uh.ID,
+			Date:        today,
+			Value:       0,
+			IsCompleted: false,
+		})
 	}
+
+	err := r.db.
+		Model(&model.HabitProgress{}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "user_habit_id"}, {Name: "date"}},
+			DoNothing: true,
+		}).
+		Create(&records).Error
+
+	if err != nil {
+		r.logger.Error("failed to ensure progress for user habit", err)
+		return err
+	}
+	
 	return nil
 }
 
@@ -276,6 +266,20 @@ func (r *HabitRepo) GetTodayHabitProgress(userHabitId uint) (*model.HabitProgres
 	}
 
 	return &habits, nil
+}
+
+func (r *HabitRepo) GetTodayHabitProgresses(userHabitId []uint) ([]model.HabitProgress, error) {
+	var habits []model.HabitProgress
+	err := r.db.Where("user_habit_id IN ?", userHabitId).
+		Where("date = ?", time.Now().Truncate(24*time.Hour)).
+		Find(&habits).Error
+
+	if err != nil {
+		r.logger.Error("failed to get habit progress", err)
+		return nil, err
+	}
+
+	return habits, nil
 }
 
 func (r *HabitRepo) GetUserHabitProgresses(userId uint, userHabitId uint, from, to time.Time) ([]model.HabitProgress, error) {
