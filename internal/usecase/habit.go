@@ -3,6 +3,7 @@ package usecase
 import (
 	"fmt"
 	"math/rand"
+	"routinist/internal/domain/model"
 	"routinist/internal/domain/repository"
 	"routinist/internal/dto/response"
 	"routinist/internal/util"
@@ -38,17 +39,20 @@ func (uc *habitUseCase) CreateUserHabit(userId uint, habitId uint, unitId *uint,
 		return "", fmt.Errorf("failed to create habit: %w", err)
 	}
 
-	err = uc.repo.EnsureTodayProgressForUser(uh.UserID)
-
-	if err != nil {
+	if err := uc.repo.EnsureTodayProgressForUser(uh.UserID); err != nil {
 		uc.logger.Error(err)
-		return "", fmt.Errorf("failed to create habit progress: %w", err)
+		return "", fmt.Errorf("failed to prepare today's habit progress: %w", err)
 	}
 
 	return "success to create user habit", err
 }
 func (uc *habitUseCase) GetRandomHabits() (*[]response.HabitDto, error) {
 	habits, err := uc.repo.GetRandomHabits()
+
+	if habits == nil {
+		return &[]response.HabitDto{}, nil
+	}
+
 	var result []response.HabitDto
 
 	if err != nil {
@@ -64,24 +68,37 @@ func (uc *habitUseCase) GetRandomHabits() (*[]response.HabitDto, error) {
 }
 
 func (uc *habitUseCase) GetTodayHabitProgresses(userId uint) ([]response.UserHabitProgressDto, error) {
-	uh, err := uc.repo.GetTodayHabits(userId)
+	userHabits, err := uc.repo.GetTodayHabits(userId)
 
 	if err != nil {
 		uc.logger.Error(err)
 		return nil, fmt.Errorf("failed to get today habits: %w", err)
 	}
 
+	var uids []uint
+	for _, uh := range userHabits {
+		uids = append(uids, uh.ID)
+	}
+
+	progresses, err := uc.repo.GetTodayHabitProgresses(uids)
+	if err != nil {
+		uc.logger.Error("Failed to fetch progress records: ", err)
+		return nil, err
+	}
+
+	progressMap := make(map[uint]model.HabitProgress)
+	for _, p := range progresses {
+		progressMap[p.UserHabitID] = p
+	}
+
 	var result []response.UserHabitProgressDto
 
-	for _, u := range uh {
-		p, err := uc.repo.GetTodayHabitProgress(u.ID)
+	for _, u := range userHabits {
+		progress := progressMap[u.ID]
 
-		if err != nil {
-			uc.logger.Error(err)
-			return nil, fmt.Errorf("failed to get habit progress: %w", err)
-		}
-		result = append(result, response.ToUserHabitProgressDto(&u, p))
+		result = append(result, response.ToUserHabitProgressDto(&u, &progress))
 	}
+
 	return result, nil
 }
 
@@ -201,46 +218,36 @@ func (uc *habitUseCase) GetUserHabits(userId uint) ([]response.UserHabitDto, err
 }
 
 func (uc *habitUseCase) GetUserHabitDailyStats(userID uint, from, to time.Time) ([]response.DailyHabitStat, error) {
+	end := to
 	hp, err := uc.repo.GetUserHabitProgresses(userID, 0, from, to)
 
 	if err != nil {
-		uc.logger.Error(err)
+		uc.logger.Error("Failed to get progress: ", err)
 		return nil, err
 	}
 
-	start := from
-	chartMap := map[string]*response.DailyHabitStat{}
-	for i := 0; i < 7; i++ {
-		day := start.AddDate(0, 0, i)
-		key := day.Format("2006-01-02")
-		chartMap[key] = &response.DailyHabitStat{
-			Date:    day,
-			Total:   0,
-			Success: 0,
+	var result []response.DailyHabitStat
+
+	// For each day in the 7-day range (oldest → newest)
+	for i := 6; i >= 0; i-- {
+		r := response.DailyHabitStat{}
+		day := end.AddDate(0, 0, -i)
+		dayKey := day.Format("2006-01-02")
+
+		for _, p := range hp {
+			if p.Date.Format("2006-01-02") == dayKey {
+				r.Total++
+
+				if p.IsCompleted {
+					r.Success++
+				}
+			}
 		}
-	}
-	// populate stats
-	for _, prog := range hp {
-		key := prog.Date.Format("2006-01-02")
-		stat, exists := chartMap[key]
-		if !exists {
-			// Shouldn't happen, but guard just in case
-			continue
-		}
-		stat.Total++
-		if prog.IsCompleted {
-			stat.Success++
-		}
-	}
-	// build ordered slice for output
-	dailyStats := make([]response.DailyHabitStat, 0, 7)
-	for i := 0; i < 7; i++ {
-		day := start.AddDate(0, 0, i)
-		key := day.Format("2006-01-02")
-		dailyStats = append(dailyStats, *chartMap[key])
+
+		result = append(result, r)
 	}
 
-	return dailyStats, nil
+	return result, nil
 }
 
 func generateRandomColor() float64 {
