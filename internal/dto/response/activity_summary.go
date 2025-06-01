@@ -6,4 +6,5 @@ type ActivitySummaryDto struct {
 	Failed        uint    `json:"failed"`
 	UserHabitId   uint    `json:"user_habit_id"`
 	UserHabitName string  `json:"user_habit_name"`
+	UserHabitIcon string  `json:"user_habit_icon"`
 }

@@ -310,3 +310,18 @@ func (r *HabitRepo) GetActivitySummary(userId uint, userHabitId uint, from, to t
 
 	return completedCount, int64(len(progresses)), failedCount, nil
 }
+
+func (r *HabitRepo) GetUserHabits(userId uint) ([]*model.UserHabit, error) {
+	var userHabits []*model.UserHabit
+	err := r.db.Preload("Habit").
+		Preload("Unit").
+		Where("user_id = ?", userId).
+		Find(&userHabits).Error
+
+	if err != nil {
+		r.logger.Error("failed to get habit", err)
+		return nil, err
+	}
+
+	return userHabits, nil
+}

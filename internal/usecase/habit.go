@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"routinist/internal/domain/repository"
 	"routinist/internal/dto/response"
+	"routinist/internal/util"
 	"routinist/pkg/logger"
 	"time"
 )
@@ -12,10 +13,11 @@ import (
 type HabitUsecase interface {
 	CreateUserHabit(userId uint, habitId uint, unitId *uint, goal *float64) (string, error)
 	GetRandomHabits() (*[]response.HabitDto, error)
-	GetTodayHabits(userId uint) ([]response.UserHabitDto, error)
+	GetTodayHabitProgresses(userId uint) ([]response.UserHabitProgressDto, error)
 	PostCreateHabitProgress(userId uint, userHabitId uint, value float64) (*response.CreateProgressDto, error)
 	GetProgressSummary(userID uint, from, to time.Time) (*response.ProgressSummaryDto, error)
 	GetActivitySummary(userID uint, userHabitId uint, from, to time.Time) (*response.ActivitySummaryDto, error)
+	GetUserHabits(userId uint) ([]response.UserHabitDto, error)
 }
 
 type habitUseCase struct {
@@ -60,7 +62,7 @@ func (uc *habitUseCase) GetRandomHabits() (*[]response.HabitDto, error) {
 	return &result, nil
 }
 
-func (uc *habitUseCase) GetTodayHabits(userId uint) ([]response.UserHabitDto, error) {
+func (uc *habitUseCase) GetTodayHabitProgresses(userId uint) ([]response.UserHabitProgressDto, error) {
 	uh, err := uc.repo.GetTodayHabits(userId)
 
 	if err != nil {
@@ -68,7 +70,7 @@ func (uc *habitUseCase) GetTodayHabits(userId uint) ([]response.UserHabitDto, er
 		return nil, fmt.Errorf("failed to get today habits: %w", err)
 	}
 
-	var result []response.UserHabitDto
+	var result []response.UserHabitProgressDto
 
 	for _, u := range uh {
 		p, err := uc.repo.GetTodayHabitProgress(u.ID)
@@ -77,7 +79,7 @@ func (uc *habitUseCase) GetTodayHabits(userId uint) ([]response.UserHabitDto, er
 			uc.logger.Error(err)
 			return nil, fmt.Errorf("failed to get habit progress: %w", err)
 		}
-		result = append(result, response.ToUserHabitDto(&u, p))
+		result = append(result, response.ToUserHabitProgressDto(&u, p))
 	}
 	return result, nil
 }
@@ -133,6 +135,7 @@ func (uc *habitUseCase) GetProgressSummary(userID uint, from, to time.Time) (*re
 func (uc *habitUseCase) GetActivitySummary(userID uint, userHabitId uint, from, to time.Time) (*response.ActivitySummaryDto, error) {
 	var habitName string
 	var habitId uint
+	var habitIcon string
 
 	completed, total, failed, err := uc.repo.GetActivitySummary(userID, userHabitId, from, to)
 	if err != nil {
@@ -150,6 +153,7 @@ func (uc *habitUseCase) GetActivitySummary(userID uint, userHabitId uint, from, 
 
 		habitName = uh.Habit.Name
 		habitId = uh.HabitID
+		habitIcon = uh.Habit.Icon
 	}
 
 	percentage := 0.0
@@ -158,12 +162,30 @@ func (uc *habitUseCase) GetActivitySummary(userID uint, userHabitId uint, from, 
 	}
 
 	return &response.ActivitySummaryDto{
-		SuccessRate:   percentage,
+		SuccessRate:   util.RoundFloat(percentage, 2),
 		Completed:     uint(completed),
 		Failed:        uint(failed),
 		UserHabitName: habitName,
 		UserHabitId:   habitId,
+		UserHabitIcon: habitIcon,
 	}, nil
+}
+
+func (uc *habitUseCase) GetUserHabits(userId uint) ([]response.UserHabitDto, error) {
+	uh, err := uc.repo.GetUserHabits(userId)
+
+	if err != nil {
+		uc.logger.Error(err)
+		return nil, fmt.Errorf("failed to get user habit: %w", err)
+	}
+
+	var result []response.UserHabitDto
+
+	for _, u := range uh {
+		result = append(result, response.ToUserHabitDto(u))
+	}
+
+	return result, nil
 }
 
 func generateRandomColor() float64 {

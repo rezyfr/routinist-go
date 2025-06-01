@@ -29,10 +29,11 @@ func NewHabitRoutes(handler *gin.RouterGroup, t usecase.HabitUsecase, l logger.I
 	auth := handler.Group("/protected/habit", middleware.JWTAuthMiddleware())
 	{
 		auth.POST("/create", r.createUserHabit)
-		auth.GET("/today", r.getTodayHabits)
+		auth.GET("/today", r.getTodayHabitProgresses)
 		auth.POST("/:user_habit_id/progress", r.postCreateProgress)
 		auth.GET("/progress-summary", r.GetSummaryProgress)
 		auth.POST("/activity-summary", r.GetActivitySummary)
+		auth.GET("/user-habits", r.GetUserHabits)
 	}
 }
 
@@ -79,14 +80,14 @@ func (h *HabitHandler) getRandomHabits(c *gin.Context) {
 	c.JSON(http.StatusOK, r)
 }
 
-func (h *HabitHandler) getTodayHabits(c *gin.Context) {
+func (h *HabitHandler) getTodayHabitProgresses(c *gin.Context) {
 	r := response.Response{}
 
 	userIDVal, _ := c.Get("user_id")
 
 	userId := userIDVal.(uint)
 
-	habits, err := h.usecase.GetTodayHabits(userId)
+	habits, err := h.usecase.GetTodayHabitProgresses(userId)
 	if err != nil {
 		h.logger.Error(err)
 		r.SetMessage("Failed to get today habits")
@@ -208,5 +209,24 @@ func (h *HabitHandler) GetActivitySummary(c *gin.Context) {
 	}
 
 	r.Data = activitySummary
+	c.JSON(http.StatusOK, r)
+}
+
+func (h *HabitHandler) GetUserHabits(c *gin.Context) {
+	r := response.Response{}
+
+	userIDVal, _ := c.Get("user_id")
+
+	userId := userIDVal.(uint)
+
+	habits, err := h.usecase.GetUserHabits(userId)
+	if err != nil {
+		h.logger.Error(err)
+		r.SetMessage("Failed to get today habits")
+		c.JSON(http.StatusInternalServerError, r)
+		return
+	}
+
+	r.Data = habits
 	c.JSON(http.StatusOK, r)
 }
