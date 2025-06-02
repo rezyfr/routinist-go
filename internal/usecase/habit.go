@@ -235,6 +235,7 @@ func (uc *habitUseCase) GetUserHabitDailyStats(userID uint, from, to time.Time) 
 		dayKey := day.Format("2006-01-02")
 
 		for _, p := range hp {
+			r.Date = day
 			if p.Date.Format("2006-01-02") == dayKey {
 				r.Total++
 
