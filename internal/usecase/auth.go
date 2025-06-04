@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"fmt"
+	"gorm.io/gorm"
 	"routinist/internal/domain/repository"
 	"routinist/internal/dto/request"
 	"routinist/pkg/logger"
@@ -26,21 +27,34 @@ func NewAuthUseCase(r repository.AuthRepository, habitRepo repository.HabitRepos
 	}
 }
 
-func (uc *authUseCase) Register(request *request.RegisterRequestDTO) (*request.AuthResponseDTO, error) {
+func (uc *authUseCase) Register(req *request.RegisterRequestDTO) (*request.AuthResponseDTO, error) {
+	var result *request.AuthResponseDTO
+	var userId uint
 
-	result, userId, err := uc.repo.Register(request)
+	db := uc.repo.GetDB()
+
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var err error
+
+		result, userId, err = uc.repo.Register(tx, req)
+		if err != nil {
+			uc.logger.Error(err)
+			return fmt.Errorf("failed to register: %w", err)
+		}
+
+		_, err = uc.habitRepo.CreateUserHabit(tx, userId, req.HabitID, nil, nil)
+		if err != nil {
+			uc.logger.Error(err)
+			return fmt.Errorf("failed to create habit: %w", err)
+		}
+
+		return nil
+	})
+
 	if err != nil {
 		uc.logger.Error(err)
-		return result, fmt.Errorf("failed to register: %w", err)
+		return nil, err // Both will be rolled back on any error!
 	}
-
-	_, err = uc.habitRepo.CreateUserHabit(userId, request.HabitID, nil, nil)
-
-	if err != nil {
-		uc.logger.Error(err)
-		return nil, fmt.Errorf("failed to create habit: %w", err)
-	}
-
 	return result, nil
 }
 

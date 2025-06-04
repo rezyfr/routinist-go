@@ -1,12 +1,13 @@
 package repository
 
 import (
+	"gorm.io/gorm"
 	"routinist/internal/domain/model"
 	"time"
 )
 
 type HabitRepository interface {
-	CreateUserHabit(userId uint, habitId uint, unitId *uint, goal *float64) (*model.UserHabit, error)
+	CreateUserHabit(db *gorm.DB, userId uint, habitId uint, unitId *uint, goal *float64) (*model.UserHabit, error)
 	GetRandomHabits() (*[]model.Habit, error)
 	GetTodayHabits(userId uint) ([]model.UserHabit, error)
 	GetUserHabit(userId uint, userHabitId uint) (*model.UserHabit, error)
@@ -19,4 +20,5 @@ type HabitRepository interface {
 	GetTodayHabitProgress(userHabitId uint) (*model.HabitProgress, error)
 	GetTodayHabitProgresses(userHabitId []uint) ([]model.HabitProgress, error)
 	GetUserHabitProgresses(userId uint, userHabitId uint, from, to time.Time) ([]model.HabitProgress, error)
+	GetDB() *gorm.DB
 }

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"fmt"
+	"gorm.io/gorm"
 	"math/rand"
 	"routinist/internal/domain/model"
 	"routinist/internal/domain/repository"
@@ -33,16 +34,26 @@ func NewHabitUseCase(r repository.HabitRepository, u repository.UserRepository, 
 }
 
 func (uc *habitUseCase) CreateUserHabit(userId uint, habitId uint, unitId *uint, goal *float64) (string, error) {
-	uh, err := uc.repo.CreateUserHabit(userId, habitId, unitId, goal)
-	if err != nil {
-		uc.logger.Error(err)
-		return "", fmt.Errorf("failed to create habit: %w", err)
-	}
+	var uh *model.UserHabit
 
-	if err := uc.repo.EnsureTodayProgressForUser(uh.UserID); err != nil {
-		uc.logger.Error(err)
-		return "", fmt.Errorf("failed to prepare today's habit progress: %w", err)
-	}
+	db := uc.repo.GetDB()
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var err error
+
+		uh, err = uc.repo.CreateUserHabit(tx, userId, habitId, unitId, goal)
+
+		if err != nil {
+			uc.logger.Error(err)
+			return fmt.Errorf("failed to create habit: %w", err)
+		}
+
+		if err := uc.repo.EnsureTodayProgressForUser(uh.UserID); err != nil {
+			uc.logger.Error(err)
+			return fmt.Errorf("failed to prepare today's habit progress: %w", err)
+		}
+
+		return nil
+	})
 
 	return "success to create user habit", err
 }

@@ -19,12 +19,12 @@ func NewHabitRepo(db *gorm.DB, logger *logger.Logger) *HabitRepo {
 	return &HabitRepo{db, logger}
 }
 
-func (r *HabitRepo) CreateUserHabit(userId uint, habitId uint, unitId *uint, goal *float64) (*model.UserHabit, error) {
+func (r *HabitRepo) CreateUserHabit(db *gorm.DB, userId uint, habitId uint, unitId *uint, goal *float64) (*model.UserHabit, error) {
 	var habit model.Habit
 	var unit model.Unit
 	var userHabit model.UserHabit
 
-	if err := r.db.Preload("Units").Where("id = ?", habitId).First(&habit).Error; err != nil {
+	if err := db.Preload("Units").Where("id = ?", habitId).First(&habit).Error; err != nil {
 		r.logger.Error("failed to get habit", err)
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (r *HabitRepo) CreateUserHabit(userId uint, habitId uint, unitId *uint, goa
 		Goal:    *goal,
 	}
 
-	result := r.db.Create(&userHabit)
+	result := db.Create(&userHabit)
 	if result.Error != nil {
 		r.logger.Error("failed to create user habit", result.Error)
 		return nil, result.Error
@@ -250,7 +250,7 @@ func (r *HabitRepo) EnsureTodayProgressForUser(userId uint) error {
 		r.logger.Error("failed to ensure progress for user habit", err)
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -315,4 +315,8 @@ func (r *HabitRepo) GetUserHabits(userId uint) ([]*model.UserHabit, error) {
 	}
 
 	return userHabits, nil
+}
+
+func (r *HabitRepo) GetDB() *gorm.DB {
+	return r.db
 }
