@@ -24,11 +24,11 @@ func NewAuthRepo(db *gorm.DB, logger *logger.Logger) *AuthRepo {
 	}
 }
 
-func (rp *AuthRepo) Register(e *request.RegisterRequestDTO) (*request.AuthResponseDTO, uint, error) {
+func (rp *AuthRepo) Register(db *gorm.DB, e *request.RegisterRequestDTO) (*request.AuthResponseDTO, uint, error) {
 	// Check if email already exists
 	var user model.User
 
-	result := rp.db.Where("email = ?", e.Email).Limit(1).Find(&user)
+	result := db.Where("email = ?", e.Email).Limit(1).Find(&user)
 	exists := result.RowsAffected > 0
 	if exists {
 		return &request.AuthResponseDTO{}, 0, errors.ErrEmailAlreadyExists
@@ -54,7 +54,7 @@ func (rp *AuthRepo) Register(e *request.RegisterRequestDTO) (*request.AuthRespon
 		Gender:   e.Gender,
 	}
 
-	result = rp.db.Create(&user)
+	result = db.Create(&user)
 	if result.Error != nil {
 		return &request.AuthResponseDTO{}, 0, result.Error
 	}
@@ -87,6 +87,10 @@ func (rp *AuthRepo) Login(e *request.LoginRequestDTO) (*request.AuthResponseDTO,
 	}
 
 	return &request.AuthResponseDTO{Token: token}, user.ID, nil
+}
+
+func (rp *AuthRepo) GetDB() *gorm.DB {
+	return rp.db
 }
 
 // Randomize name consisted of 2 words, 1. Color 2. Animal. Each 20
